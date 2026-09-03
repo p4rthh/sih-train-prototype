@@ -2,7 +2,7 @@ import datetime
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Query
 
-from server.database import search_trains, get_train_schedule, get_db_connection
+from server.database import search_trains, get_train_schedule, get_db_connection, find_trains_between_stations
 from server.ingestion.weather_client import WeatherClient
 from server.simulator.kinematic_engine import TrainSimulator
 from server.features.pipeline import FeaturePipeline
@@ -11,7 +11,7 @@ from server.models.conformal_uq import ConformalCalibrator
 from server.models.explainer import DelayReasonEngine
 from server.api.schemas import (
     TrainSearchResult, ETAResponse, DynamicETA, ConfidenceInterval,
-    DelayReason, RouteStop, StationBoardItem
+    DelayReason, RouteStop, StationBoardItem, RouteSearchResultItem
 )
 
 router = APIRouter(prefix="/api", tags=["Train & ETA"])
@@ -77,6 +77,15 @@ def search_trains_endpoint(q: str = Query(..., min_length=1, description="Train 
     """Search trains by number or name."""
     results = search_trains(q, limit=15)
     return [TrainSearchResult(train_number=r["train_number"], train_name=r["train_name"]) for r in results]
+
+@router.get("/trains/route", response_model=List[RouteSearchResultItem])
+def search_trains_route_endpoint(
+    from_stn: str = Query(..., description="Origin station code or name (e.g. NDLS)"),
+    to_stn: str = Query(..., description="Destination station code or name (e.g. BCT)")
+):
+    """Find all trains running between origin and destination stations ordered by departure."""
+    results = find_trains_between_stations(from_stn, to_stn)
+    return [RouteSearchResultItem(**r) for r in results]
 
 @router.get("/train/{train_no}/schedule")
 def get_schedule_endpoint(train_no: str):

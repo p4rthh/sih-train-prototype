@@ -118,6 +118,22 @@ export async function getStationBoard(stationCode: string): Promise<StationBoard
   }
 }
 
+export async function searchTrainsBetweenStations(
+  fromStn: string,
+  toStn: string
+): Promise<any[]> {
+  if (!fromStn || !toStn) return [];
+  try {
+    const url = `${getApiBaseUrl()}/api/trains/route?from_stn=${encodeURIComponent(fromStn.trim())}&to_stn=${encodeURIComponent(toStn.trim())}`;
+    const res = await fetch(url, { headers: DEFAULT_HEADERS });
+    if (!res.ok) throw new Error(`Route search failed: ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn(`[API] searchTrainsBetweenStations failed at ${getApiBaseUrl()}:`, err);
+    return [];
+  }
+}
+
 export function getTrainStreamURL(trainNo: string): string {
   const wsUrl = `${getWsBaseUrl()}/api/train/${encodeURIComponent(trainNo)}/stream`;
   return wsUrl;

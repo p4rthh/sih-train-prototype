@@ -55,3 +55,15 @@ class StationBoardItem(BaseModel):
     delay_min: float
     status: str
     delay_tag: str
+
+class RouteSearchResultItem(BaseModel):
+    train_number: str
+    train_name: str
+    from_station_code: str
+    from_station_name: str
+    from_departure: str
+    to_station_code: str
+    to_station_name: str
+    to_arrival: str
+    duration: str
+    stop_count: int

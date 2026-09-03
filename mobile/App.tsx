@@ -4,16 +4,17 @@ import { StyleSheet, View, Text, TouchableOpacity, Modal, TextInput, Alert } fro
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { TrainDetailScreen } from "./screens/TrainDetailScreen";
 import { StationBoardScreen } from "./screens/StationBoardScreen";
+import { RouteSearchScreen } from "./screens/RouteSearchScreen";
 import { getActiveHost, setCustomHost, getApiBaseUrl } from "./services/api";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"tracker" | "station">("tracker");
+  const [activeTab, setActiveTab] = useState<"tracker" | "route" | "station">("tracker");
   const [activeTrainNo, setActiveTrainNo] = useState<string>("12952");
   const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
   const [tempHost, setTempHost] = useState<string>(getActiveHost());
   const [refreshKey, setRefreshKey] = useState<number>(0);
 
-  const handleSelectTrainFromBoard = (trainNo: string) => {
+  const handleSelectTrain = (trainNo: string) => {
     setActiveTrainNo(trainNo);
     setActiveTab("tracker");
   };
@@ -59,7 +60,16 @@ export default function App() {
               onPress={() => setActiveTab("tracker")}
             >
               <Text style={[styles.tabText, activeTab === "tracker" && styles.tabTextActive]}>
-                Live Train Tracker
+                Live Tracker
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.tabBtn, activeTab === "route" && styles.tabBtnActive]}
+              onPress={() => setActiveTab("route")}
+            >
+              <Text style={[styles.tabText, activeTab === "route" && styles.tabTextActive]}>
+                From ➔ To
               </Text>
             </TouchableOpacity>
 
@@ -76,10 +86,14 @@ export default function App() {
 
         {/* Screen Content */}
         <View style={styles.content} key={refreshKey}>
-          {activeTab === "tracker" ? (
+          {activeTab === "tracker" && (
             <TrainDetailScreen initialTrainNo={activeTrainNo} />
-          ) : (
-            <StationBoardScreen onSelectTrain={handleSelectTrainFromBoard} />
+          )}
+          {activeTab === "route" && (
+            <RouteSearchScreen onSelectTrain={handleSelectTrain} />
+          )}
+          {activeTab === "station" && (
+            <StationBoardScreen onSelectTrain={handleSelectTrain} />
           )}
         </View>
 
@@ -89,13 +103,13 @@ export default function App() {
             <View style={styles.modalBox}>
               <Text style={styles.modalTitle}>Configure Backend Server IP</Text>
               <Text style={styles.modalDesc}>
-                If running on a physical phone via Expo Go, enter your computer's local Wi-Fi IP address (e.g. 192.168.1.x) or localhost:
+                If running on a physical phone via Expo Go, enter your computer's local Wi-Fi IP address or ngrok domain:
               </Text>
               <TextInput
                 style={styles.modalInput}
                 value={tempHost}
                 onChangeText={setTempHost}
-                placeholder="e.g. 192.168.1.15 or 10.0.2.2"
+                placeholder="e.g. 192.168.1.15 or https://xxxx.ngrok-free.app"
                 autoCapitalize="none"
                 autoCorrect={false}
               />
@@ -166,7 +180,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#334155",
-    maxWidth: 130,
+    maxWidth: 140,
   },
   serverDot: {
     width: 6,
@@ -196,7 +210,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#2563eb",
   },
   tabText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
     color: "#94a3b8",
   },

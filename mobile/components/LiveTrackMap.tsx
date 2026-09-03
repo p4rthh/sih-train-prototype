@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, StyleSheet, Dimensions } from "react-native";
+import React, { useMemo } from "react";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { RouteStop } from "../types";
 
 interface Props {
@@ -10,12 +10,171 @@ interface Props {
   trainNo: string;
 }
 
-const { width } = Dimensions.get("window");
-
 export const LiveTrackMap: React.FC<Props> = ({ lat, lon, speedKmh, stops, trainNo }) => {
-  // Find current active stop
-  const currentStop = stops.find((s) => s.status === "current") || stops[0];
-  const nextStop = stops.find((s) => s.status === "upcoming") || stops[1] || stops[0];
+  // Extract coordinate points for the route polyline
+  const validStops = useMemo(() => {
+    return stops.filter((s) => s.lat != null && s.lon != null);
+  }, [stops]);
+
+  // Leaflet Interactive HTML Map for Web View
+  const leafletHtml = useMemo(() => {
+    const latlngs = validStops.map((s) => `[${s.lat}, ${s.lon}]`).join(",\n");
+    const stationMarkers = validStops
+      .filter((s, idx) => idx === 0 || idx === validStops.length - 1 || idx % 2 === 0)
+      .map((s) => {
+        const isPast = s.status === "departed";
+        const color = isPast ? "#16a34a" : s.status === "current" ? "#2563eb" : "#64748b";
+        return `
+          L.circleMarker([${s.lat}, ${s.lon}], {
+            radius: 5,
+            fillColor: "${color}",
+            color: "#ffffff",
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9
+          }).bindPopup("<b>${s.station_name} (${s.station_code})</b><br>Arr: ${s.scheduled_arrival || '--'} | Status: ${s.status}")
+            .addTo(map);
+        `;
+      })
+      .join("\n");
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          html, body, #map {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background: #090d16;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          }
+          .train-marker-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .train-pulse {
+            position: absolute;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(37, 99, 235, 0.35);
+            animation: pulse-ring 1.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+          }
+          @keyframes pulse-ring {
+            0% { transform: scale(0.6); opacity: 0.9; }
+            100% { transform: scale(1.6); opacity: 0; }
+          }
+          .train-icon-badge {
+            width: 30px;
+            height: 30px;
+            border-radius: 15px;
+            background: #1d4ed8;
+            border: 2px solid #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            box-shadow: 0 0 12px rgba(37, 99, 235, 0.8);
+            z-index: 10;
+          }
+          .train-tooltip {
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid #334155;
+            border-radius: 6px;
+            color: #ffffff;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+          }
+          .recenter-btn {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            z-index: 1000;
+            background: #2563eb;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          }
+        </style>
+      </head>
+      <body>
+        <div id="map"></div>
+        <button class="recenter-btn" onclick="recenter()">⌖ Center on Train</button>
+        <script>
+          const trainPos = [${lat}, ${lon}];
+          const map = L.map('map', {
+            zoomControl: true,
+            attributionControl: false
+          }).setView(trainPos, 7);
+
+          // OpenStreetMap CartoDB Dark/Voyager tiles
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            maxZoom: 18
+          }).addTo(map);
+
+          // Railway Track Polyline
+          const trackPoints = [
+            ${latlngs}
+          ];
+
+          if (trackPoints.length > 1) {
+            // Glow border polyline
+            L.polyline(trackPoints, {
+              color: '#3b82f6',
+              weight: 6,
+              opacity: 0.5
+            }).addTo(map);
+
+            // Core track line
+            L.polyline(trackPoints, {
+              color: '#1d4ed8',
+              weight: 3,
+              opacity: 0.9
+            }).addTo(map);
+          }
+
+          // Station milestone markers
+          ${stationMarkers}
+
+          // Custom animated Train Marker
+          const trainIcon = L.divIcon({
+            className: 'train-marker-wrap',
+            html: '<div class="train-pulse"></div><div class="train-icon-badge">🚆</div>',
+            iconSize: [42, 42],
+            iconAnchor: [21, 21]
+          });
+
+          const trainMarker = L.marker(trainPos, { icon: trainIcon }).addTo(map);
+          trainMarker.bindTooltip("<div class='train-tooltip'>Train #${trainNo}<br>${Math.round(speedKmh)} km/h</div>", {
+            permanent: true,
+            direction: 'top',
+            offset: [0, -18]
+          });
+
+          function recenter() {
+            map.setView([${lat}, ${lon}], 8, { animate: true });
+          }
+        </script>
+      </body>
+      </html>
+    `;
+  }, [lat, lon, speedKmh, validStops, trainNo]);
 
   return (
     <View style={styles.card}>
@@ -23,68 +182,68 @@ export const LiveTrackMap: React.FC<Props> = ({ lat, lon, speedKmh, stops, train
       <View style={styles.headerRow}>
         <View style={styles.titleRow}>
           <Text style={styles.mapIcon}>🗺️</Text>
-          <Text style={styles.title}>LIVE RAILWAY TRACK GEOMETRY</Text>
+          <Text style={styles.title}>LIVE RAILWAY TRACK GEOMETRY & TRAIN POSITION</Text>
         </View>
         <View style={styles.speedPill}>
           <Text style={styles.speedText}>{Math.round(speedKmh)} km/h</Text>
         </View>
       </View>
 
-      {/* Visual Track Map Canvas */}
-      <View style={styles.mapCanvas}>
-        {/* Background Track Grid Lines */}
-        <View style={styles.gridLine1} />
-        <View style={styles.gridLine2} />
+      {/* Interactive Leaflet Map for Web / Browser */}
+      {Platform.OS === "web" ? (
+        <View style={styles.mapContainer}>
+          <iframe
+            srcDoc={leafletHtml}
+            style={{
+              width: "100%",
+              height: "100%",
+              border: "none",
+              borderRadius: 12,
+            }}
+            title="Live Railway Track Map"
+          />
+        </View>
+      ) : (
+        /* Native Fallback Canvas */
+        <View style={styles.mapCanvas}>
+          <View style={styles.gridLine1} />
+          <View style={styles.gridLine2} />
+          <View style={styles.trackLine} />
 
-        {/* The Track Polyline */}
-        <View style={styles.trackLine} />
+          <View style={styles.stationsRow}>
+            <View style={styles.stationMarkerBox}>
+              <View style={[styles.stationDot, styles.dotPassed]} />
+              <Text style={styles.stationCode} numberOfLines={1}>
+                {stops[0]?.station_code || "START"}
+              </Text>
+              <Text style={styles.stationTime}>{stops[0]?.scheduled_departure || "16:30"}</Text>
+            </View>
 
-        {/* Station Markers along track */}
-        <View style={styles.stationsRow}>
-          {/* Origin Station */}
-          <View style={styles.stationMarkerBox}>
-            <View style={[styles.stationDot, styles.dotPassed]} />
-            <Text style={styles.stationCode} numberOfLines={1}>
-              {stops[0]?.station_code || "START"}
-            </Text>
-            <Text style={styles.stationTime}>{stops[0]?.scheduled_departure || "16:30"}</Text>
-          </View>
-
-          {/* Current Section & Moving Train Dot */}
-          <View style={styles.activeSectionBox}>
-            <View style={styles.trainMarkerWrapper}>
-              <View style={styles.trainGlowRing} />
-              <View style={styles.trainDot}>
-                <Text style={styles.locoIcon}>🚆</Text>
+            <View style={styles.activeSectionBox}>
+              <View style={styles.trainMarkerWrapper}>
+                <View style={styles.trainGlowRing} />
+                <View style={styles.trainDot}>
+                  <Text style={styles.locoIcon}>🚆</Text>
+                </View>
+              </View>
+              <View style={styles.trainLabelCard}>
+                <Text style={styles.trainLabelText}>Train #{trainNo}</Text>
+                <Text style={styles.telemetryMini}>
+                  {lat.toFixed(3)}°N, {lon.toFixed(3)}°E
+                </Text>
               </View>
             </View>
-            <View style={styles.trainLabelCard}>
-              <Text style={styles.trainLabelText}>Train #{trainNo}</Text>
-              <Text style={styles.telemetryMini}>
-                {lat.toFixed(3)}°N, {lon.toFixed(3)}°E
+
+            <View style={styles.stationMarkerBox}>
+              <View style={[styles.stationDot, styles.dotUpcoming]} />
+              <Text style={styles.stationCode} numberOfLines={1}>
+                {stops[stops.length - 1]?.station_code || "DEST"}
               </Text>
+              <Text style={styles.stationTime}>{stops[stops.length - 1]?.scheduled_arrival || "END"}</Text>
             </View>
           </View>
-
-          {/* Next Approaching Station */}
-          <View style={styles.stationMarkerBox}>
-            <View style={[styles.stationDot, styles.dotNext]} />
-            <Text style={styles.stationCode} numberOfLines={1}>
-              {nextStop?.station_code || "NEXT"}
-            </Text>
-            <Text style={styles.stationTime}>{nextStop?.eta || nextStop?.scheduled_arrival || "ETA"}</Text>
-          </View>
-
-          {/* Final Destination */}
-          <View style={styles.stationMarkerBox}>
-            <View style={[styles.stationDot, styles.dotUpcoming]} />
-            <Text style={styles.stationCode} numberOfLines={1}>
-              {stops[stops.length - 1]?.station_code || "DEST"}
-            </Text>
-            <Text style={styles.stationTime}>{stops[stops.length - 1]?.scheduled_arrival || "END"}</Text>
-          </View>
         </View>
-      </View>
+      )}
 
       {/* Telemetry Footer Bar */}
       <View style={styles.telemetryBar}>
@@ -99,8 +258,8 @@ export const LiveTrackMap: React.FC<Props> = ({ lat, lon, speedKmh, stops, train
         </View>
         <View style={styles.telemetryDivider} />
         <View style={styles.telemetryCol}>
-          <Text style={styles.telemLabel}>NAV SATELLITES</Text>
-          <Text style={styles.telemVal}>NavIC (Lock)</Text>
+          <Text style={styles.telemLabel}>SATELLITE POSITION</Text>
+          <Text style={styles.telemVal}>Real GPS Track</Text>
         </View>
       </View>
     </View>
@@ -153,6 +312,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     color: "#15803d",
+  },
+  mapContainer: {
+    height: 340,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
   },
   mapCanvas: {
     height: 140,
@@ -207,10 +373,6 @@ const styles = StyleSheet.create({
   },
   dotPassed: {
     backgroundColor: "#22c55e",
-  },
-  dotNext: {
-    backgroundColor: "#eab308",
-    borderColor: "#fef08a",
   },
   dotUpcoming: {
     backgroundColor: "#64748b",

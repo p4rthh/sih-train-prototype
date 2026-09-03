@@ -108,3 +108,66 @@ def get_station_info(station_code: str) -> Optional[Dict[str, Any]]:
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+def find_trains_between_stations(from_stn: str, to_stn: str, limit: int = 30) -> List[Dict[str, Any]]:
+    """Finds all trains running from origin to destination station ordered by departure time."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    from_clean = from_stn.strip().upper()
+    to_clean = to_stn.strip().upper()
+    from_like = f"%{from_stn.strip()}%"
+    to_like = f"%{to_stn.strip()}%"
+
+    cursor.execute("""
+        SELECT 
+            s1.train_number,
+            s1.train_name,
+            s1.departure AS from_departure,
+            s1.station_code AS from_code,
+            s1.station_name AS from_name,
+            s2.arrival AS to_arrival,
+            s2.station_code AS to_code,
+            s2.station_name AS to_name,
+            s1.day AS from_day,
+            s2.day AS to_day,
+            (s2.seq - s1.seq) AS stop_count
+        FROM schedules s1
+        JOIN schedules s2 ON s1.train_number = s2.train_number
+        WHERE (s1.station_code = ? OR s1.station_name LIKE ?)
+          AND (s2.station_code = ? OR s2.station_name LIKE ?)
+          AND s1.seq < s2.seq
+        ORDER BY s1.departure ASC
+        LIMIT ?
+    """, (from_clean, from_like, to_clean, to_like, limit))
+    rows = cursor.fetchall()
+    conn.close()
+
+    results = []
+    for r in rows:
+        dep = r["from_departure"] or "00:00:00"
+        arr = r["to_arrival"] or "00:00:00"
+        try:
+            dep_h, dep_m = map(int, str(dep).split(":")[:2])
+            arr_h, arr_m = map(int, str(arr).split(":")[:2])
+            day_diff = max(0, int(r["to_day"]) - int(r["from_day"]))
+            dur_mins = (day_diff * 1440) + (arr_h * 60 + arr_m) - (dep_h * 60 + dep_m)
+            if dur_mins < 0:
+                dur_mins += 1440
+            dur_str = f"{dur_mins // 60}h {dur_mins % 60}m"
+        except Exception:
+            dur_str = "--"
+
+        results.append({
+            "train_number": r["train_number"],
+            "train_name": r["train_name"],
+            "from_station_code": r["from_code"],
+            "from_station_name": r["from_name"],
+            "from_departure": str(dep)[:5],
+            "to_station_code": r["to_code"],
+            "to_station_name": r["to_name"],
+            "to_arrival": str(arr)[:5],
+            "duration": dur_str,
+            "stop_count": r["stop_count"]
+        })
+
+    return results
