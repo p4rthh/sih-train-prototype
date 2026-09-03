@@ -4,17 +4,20 @@ import Constants from "expo-constants";
 
 /**
  * Automatically resolves the correct backend host address.
- * 
- * 1. When running on a physical device via Expo Go, extracts the computer's
- *    LAN IP address directly from Metro's hostUri (e.g. 192.168.1.x).
- * 2. When running in the standard Android emulator, falls back to 10.0.2.2.
- * 3. When running on iOS simulator or web, uses localhost.
  */
 function resolveBackendHost(): string {
   try {
-    // Check Expo hostUri (contains the IP address of the machine running Metro)
-    const hostUri = Constants.expoConfig?.hostUri ?? (Constants as any).manifest?.debuggerHost ?? (Constants as any).manifest2?.extra?.expoClient?.hostUri;
+    const hostUri =
+      Constants.expoConfig?.hostUri ??
+      (Constants as any).manifest?.debuggerHost ??
+      (Constants as any).manifest2?.extra?.expoClient?.hostUri;
+
     if (hostUri && typeof hostUri === "string") {
+      // If running via Expo ngrok tunnel (e.g. xxxx.ngrok.io or xxxx.exp.direct)
+      if (hostUri.includes("ngrok") || hostUri.includes("exp.direct")) {
+        // Will be configured or fall back
+        return hostUri.split(":")[0];
+      }
       const ip = hostUri.split(":")[0];
       if (ip && ip !== "localhost" && ip !== "127.0.0.1") {
         return ip;
@@ -24,24 +27,65 @@ function resolveBackendHost(): string {
     console.warn("[API] Could not resolve host from Expo Constants:", err);
   }
 
-  // Fallback defaults
   return Platform.OS === "android" ? "10.0.2.2" : "localhost";
 }
 
 let currentHost = resolveBackendHost();
+
 export const getActiveHost = () => currentHost;
+
 export const setCustomHost = (newHost: string) => {
-  currentHost = newHost.trim();
-  console.log("[API] Backend host overridden to:", currentHost);
+  let clean = newHost.trim();
+  // Strip trailing slash
+  clean = clean.replace(/\/+$/, "");
+  currentHost = clean;
+  console.log("[API] Backend target configured to:", currentHost);
 };
 
-export const getApiBaseUrl = () => `http://${currentHost}:8000`;
-export const getWsBaseUrl = () => `ws://${currentHost}:8000`;
+export const getApiBaseUrl = (): string => {
+  const host = currentHost.trim();
+
+  // If already a full URL (e.g. https://xxxx.ngrok-free.app)
+  if (host.startsWith("http://") || host.startsWith("https://")) {
+    return host;
+  }
+
+  // If it's an ngrok or public tunnel domain without protocol
+  if (host.includes("ngrok") || host.includes("loca.lt") || host.includes("trycloudflare.com")) {
+    return `https://${host}`;
+  }
+
+  // Standard LAN IP or localhost
+  const hostWithPort = host.includes(":") ? host : `${host}:8000`;
+  return `http://${hostWithPort}`;
+};
+
+export const getWsBaseUrl = (): string => {
+  const apiBase = getApiBaseUrl();
+
+  // If HTTPS -> use secure WebSocket WSS
+  if (apiBase.startsWith("https://")) {
+    return apiBase.replace("https://", "wss://");
+  }
+
+  // If HTTP -> use WS
+  if (apiBase.startsWith("http://")) {
+    return apiBase.replace("http://", "ws://");
+  }
+
+  return `ws://${currentHost}:8000`;
+};
+
+const DEFAULT_HEADERS = {
+  "Content-Type": "application/json",
+  "ngrok-skip-browser-warning": "true", // Bypasses ngrok free tier interstitial warning page
+};
 
 export async function searchTrains(query: string): Promise<TrainSearchResult[]> {
   if (!query || query.trim().length === 0) return [];
   try {
-    const res = await fetch(`${getApiBaseUrl()}/api/trains/search?q=${encodeURIComponent(query.trim())}`);
+    const url = `${getApiBaseUrl()}/api/trains/search?q=${encodeURIComponent(query.trim())}`;
+    const res = await fetch(url, { headers: DEFAULT_HEADERS });
     if (!res.ok) throw new Error(`Search failed: ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -52,7 +96,8 @@ export async function searchTrains(query: string): Promise<TrainSearchResult[]> 
 
 export async function getTrainETA(trainNo: string): Promise<ETAResponse | null> {
   try {
-    const res = await fetch(`${getApiBaseUrl()}/api/train/${encodeURIComponent(trainNo)}/eta`);
+    const url = `${getApiBaseUrl()}/api/train/${encodeURIComponent(trainNo)}/eta`;
+    const res = await fetch(url, { headers: DEFAULT_HEADERS });
     if (!res.ok) throw new Error(`ETA failed: ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -63,7 +108,8 @@ export async function getTrainETA(trainNo: string): Promise<ETAResponse | null> 
 
 export async function getStationBoard(stationCode: string): Promise<StationBoardItem[]> {
   try {
-    const res = await fetch(`${getApiBaseUrl()}/api/station/${encodeURIComponent(stationCode)}/board`);
+    const url = `${getApiBaseUrl()}/api/station/${encodeURIComponent(stationCode)}/board`;
+    const res = await fetch(url, { headers: DEFAULT_HEADERS });
     if (!res.ok) throw new Error(`Station board failed: ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -73,5 +119,6 @@ export async function getStationBoard(stationCode: string): Promise<StationBoard
 }
 
 export function getTrainStreamURL(trainNo: string): string {
-  return `${getWsBaseUrl()}/api/train/${encodeURIComponent(trainNo)}/stream`;
+  const wsUrl = `${getWsBaseUrl()}/api/train/${encodeURIComponent(trainNo)}/stream`;
+  return wsUrl;
 }
