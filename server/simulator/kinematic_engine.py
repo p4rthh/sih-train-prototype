@@ -6,21 +6,16 @@ from server.config import get_train_priority, FOG_SEVERE_THRESHOLD_M, FOG_MODERA
 from server.ingestion.station_coords import haversine_distance_km
 
 class TrainSimulator:
-    """
-    Kinematic simulator modeling train movement along a real scheduled route.
-    Calculates trapezoidal acceleration, speed restrictions, and stochastic delay perturbations.
-    """
     def __init__(self, train_no: str, schedule: List[Dict[str, Any]], start_delay_min: float = 0.0):
         self.train_no = str(train_no).strip()
         self.schedule = schedule
         self.train_name = schedule[0].get("train_name", f"Train {train_no}") if schedule else f"Train {train_no}"
         self.priority = get_train_priority(self.train_no, self.train_name)
         
-        # Max operational speed based on priority
         if self.priority == 1:
             self.max_speed_kmh = 130.0
-            self.accel = 0.5 # m/s^2
-            self.decel = 0.6 # m/s^2
+            self.accel = 0.5
+            self.decel = 0.6
         elif self.priority == 2:
             self.max_speed_kmh = 110.0
             self.accel = 0.4
@@ -30,10 +25,8 @@ class TrainSimulator:
             self.accel = 0.35
             self.decel = 0.45
 
-        # Initialize route stops with cumulative distances
         self._init_route_geometry()
 
-        # State variables
         self.current_stop_idx = 0
         self.current_speed_kmh = 0.0
         self.current_delay_min = float(start_delay_min)
@@ -42,11 +35,10 @@ class TrainSimulator:
         self.current_lat = self.route_stops[0]["lat"]
         self.current_lon = self.route_stops[0]["lon"]
         self.section_dist_covered_km = 0.0
-        self.status = "RUNNING" # "RUNNING", "DWELLING", "HALTED_SIGNAL", "COMPLETED"
+        self.status = "RUNNING"
         self.dwell_remaining_sec = 0.0
 
     def _init_route_geometry(self):
-        """Filters valid coordinates and computes inter-station distances."""
         self.route_stops = []
         cum_dist = 0.0
         prev_lat, prev_lon = None, None
@@ -58,7 +50,6 @@ class TrainSimulator:
             
             if prev_lat is not None and prev_lon is not None:
                 sec_dist = haversine_distance_km(prev_lat, prev_lon, lat, lon)
-                # Keep reasonable section length
                 if sec_dist < 1.0:
                     sec_dist = 2.0
             else:
@@ -80,7 +71,6 @@ class TrainSimulator:
             prev_lat, prev_lon = lat, lon
 
         if not self.route_stops:
-            # Fallback single mock route if no coordinates found
             self.route_stops = [
                 {"seq": 1, "station_code": "NDLS", "station_name": "NEW DELHI", "lat": 28.6423, "lon": 77.2200, "section_km": 0.0, "cum_dist_km": 0.0, "halt_min": 0},
                 {"seq": 2, "station_code": "MTJ", "station_name": "MATHURA JN", "lat": 27.4924, "lon": 77.6737, "section_km": 141.0, "cum_dist_km": 141.0, "halt_min": 2},
@@ -90,9 +80,6 @@ class TrainSimulator:
             ]
 
     def anchor_to_ntes(self, last_station_code: str, delay_min: float, speed_kmh: float = 85.0) -> bool:
-        """
-        Anchors the simulator directly to real-time NTES ground truth.
-        """
         target_code = str(last_station_code).strip().upper()
         found_idx = None
 
@@ -110,15 +97,11 @@ class TrainSimulator:
             self.current_speed_kmh = speed_kmh
             self.section_dist_covered_km = 0.0
             self.status = "RUNNING"
-            print(f"[Sim Anchor] Anchored Train #{self.train_no} to {target_code} with real delay {delay_min}m")
             return True
 
         return False
 
     def sync_to_current_time(self) -> bool:
-        """
-        Synchronizes simulator to real-world time of day along the timetable.
-        """
         now_ist = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
         current_minute = now_ist.hour * 60 + now_ist.minute
 
@@ -147,7 +130,6 @@ class TrainSimulator:
                     self.current_speed_kmh = self.max_speed_kmh * 0.85
                     self.section_dist_covered_km = self.route_stops[idx+1]["section_km"] * frac
                     self.status = "RUNNING"
-                    print(f"[Sim Sync] Time-of-day synced Train #{self.train_no} to section {stop['station_code']}->{self.route_stops[idx+1]['station_code']}")
                     return True
             except Exception:
                 continue
@@ -155,22 +137,18 @@ class TrainSimulator:
         return False
 
     def get_effective_max_speed(self, visibility_m: float = 10000.0, precipitation_mm: float = 0.0) -> float:
-        """Determines physical speed ceiling considering weather safety caps."""
         v_cap = self.max_speed_kmh
         if visibility_m < FOG_SEVERE_THRESHOLD_M:
-            v_cap = min(v_cap, 30.0) # IR Fog Rule: 30 km/h cap
+            v_cap = min(v_cap, 30.0)
         elif visibility_m < FOG_MODERATE_THRESHOLD_M:
             v_cap = min(v_cap, 60.0)
 
         if precipitation_mm > 15.0:
-            v_cap = min(v_cap, 50.0) # Waterlogging caution order
+            v_cap = min(v_cap, 50.0)
 
         return v_cap
 
     def tick(self, dt_seconds: float = 30.0, visibility_m: float = 10000.0, precipitation_mm: float = 0.0) -> Dict[str, Any]:
-        """
-        Advances the simulation clock by dt_seconds (default 30-sec RTIS update interval).
-        """
         if self.current_stop_idx >= len(self.route_stops) - 1:
             self.status = "COMPLETED"
             self.current_speed_kmh = 0.0
@@ -180,9 +158,8 @@ class TrainSimulator:
         next_stop = self.route_stops[self.current_stop_idx + 1]
         target_section_km = next_stop["section_km"]
         if target_section_km <= 0.1:
-            target_section_km = 5.0 # Guard minimum section
+            target_section_km = 5.0
 
-        # Handle station dwelling
         if self.status == "DWELLING":
             self.dwell_remaining_sec -= dt_seconds
             if self.dwell_remaining_sec <= 0:
@@ -191,7 +168,6 @@ class TrainSimulator:
                 self.section_dist_covered_km = 0.0
             return self.get_state()
 
-        # Compute speed target & braking curve
         v_target_kmh = self.get_effective_max_speed(visibility_m, precipitation_mm)
         v_curr_mps = self.current_speed_kmh / 3.6
         v_target_mps = v_target_kmh / 3.6
@@ -199,9 +175,7 @@ class TrainSimulator:
         dist_remaining_m = max(0.0, (target_section_km - self.section_dist_covered_km) * 1000.0)
         stopping_dist_m = (v_curr_mps ** 2) / (2.0 * self.decel)
 
-        # Kinematic acceleration / deceleration
         if dist_remaining_m <= stopping_dist_m:
-            # Decelerating to stop at next station
             v_curr_mps = max(0.0, v_curr_mps - self.decel * dt_seconds)
         elif v_curr_mps < v_target_mps:
             v_curr_mps = min(v_target_mps, v_curr_mps + self.accel * dt_seconds)
@@ -210,37 +184,29 @@ class TrainSimulator:
 
         self.current_speed_kmh = round(v_curr_mps * 3.6, 1)
 
-        # Distance advanced in meters -> km
         step_km = (v_curr_mps * dt_seconds) / 1000.0
         self.section_dist_covered_km += step_km
 
-        # Interpolate Lat/Lon along straight line between current and next station
         frac = min(1.0, max(0.0, self.section_dist_covered_km / target_section_km))
         self.current_lat = round(curr_stop["lat"] + (next_stop["lat"] - curr_stop["lat"]) * frac, 6)
         self.current_lon = round(curr_stop["lon"] + (next_stop["lon"] - curr_stop["lon"]) * frac, 6)
 
-        # Check section completion
         if self.section_dist_covered_km >= target_section_km or dist_remaining_m <= 50.0:
-            # Reached next station
             self.current_lat = next_stop["lat"]
             self.current_lon = next_stop["lon"]
             self.current_speed_kmh = 0.0
             self.status = "DWELLING"
             
-            # Scheduled halt time with stochastic dwell anomaly
-            dwell_anomaly_sec = random.expovariate(1.0 / 60.0) if random.random() < 0.3 else 0.0 # 30% chance extra halt
+            dwell_anomaly_sec = random.expovariate(1.0 / 60.0) if random.random() < 0.3 else 0.0
             self.dwell_remaining_sec = (next_stop.get("halt_min", 2) * 60.0) + dwell_anomaly_sec
 
-            # Compute added delay over section compared to normal timetable
             nominal_sec = (target_section_km / self.max_speed_kmh) * 3600.0
             actual_sec = (target_section_km / max(20.0, self.get_effective_max_speed(visibility_m, precipitation_mm))) * 3600.0
             delay_added_min = max(0.0, (actual_sec - nominal_sec) / 60.0)
             
-            # Stochastic signal halt
-            if random.random() < 0.15: # 15% chance of signal check
+            if random.random() < 0.15:
                 delay_added_min += random.uniform(3.0, 8.0)
             
-            # Priority hold for lower rank trains
             if self.priority >= 4 and random.random() < 0.25:
                 delay_added_min += random.uniform(5.0, 15.0)
 

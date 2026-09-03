@@ -6,15 +6,11 @@ from server.config import RAW_SCHEDULES_FILE, DATAMEET_SCHEDULES_URL
 from server.database import get_db_connection
 
 def ensure_schedules_downloaded() -> str:
-    """Ensures schedules.json is downloaded in data/raw."""
     if not os.path.exists(RAW_SCHEDULES_FILE) or os.path.getsize(RAW_SCHEDULES_FILE) < 1000:
-        print("[Timetable] Downloading DataMeet schedules.json (~79MB)...")
         urllib.request.urlretrieve(DATAMEET_SCHEDULES_URL, RAW_SCHEDULES_FILE)
-        print("[Timetable] Download complete.")
     return str(RAW_SCHEDULES_FILE)
 
 def calculate_halt_minutes(arr: Optional[str], dep: Optional[str]) -> int:
-    """Calculates scheduled dwell time in minutes handling midnight crossover."""
     if not arr or not dep or str(arr) in ["None", "START", "--", ""] or str(dep) in ["None", "DEST", "--", ""]:
         return 0
     try:
@@ -28,9 +24,7 @@ def calculate_halt_minutes(arr: Optional[str], dep: Optional[str]) -> int:
         return 0
 
 def populate_schedules_db() -> int:
-    """Parses master schedules.json and populates the SQLite schedules table in batches."""
     file_path = ensure_schedules_downloaded()
-    print("[Timetable] Parsing 400K+ railway schedule records into SQLite...")
 
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -38,7 +32,6 @@ def populate_schedules_db() -> int:
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Track sequence number per train
     train_seq_map: Dict[str, int] = {}
     records = []
 
@@ -74,7 +67,6 @@ def populate_schedules_db() -> int:
             halt
         ))
 
-    # Fast batch insertion
     cursor.execute("DELETE FROM schedules")
     cursor.executemany("""
         INSERT INTO schedules (train_number, train_name, seq, station_code, station_name, arrival, departure, day, halt_min)
@@ -83,5 +75,4 @@ def populate_schedules_db() -> int:
 
     conn.commit()
     conn.close()
-    print(f"[Timetable] Successfully loaded {len(records)} schedule rows into database.")
     return len(records)

@@ -4,12 +4,10 @@ from server.api.routes_eta import router as eta_router, init_ml_engine
 from server.api.routes_ws import router as ws_router
 
 app = FastAPI(
-    title="RailPravah AI — Dynamic ETA Engine",
-    description="Intelligent Indian Railways Dynamic ETA Forecasting & Explainable Delay Platform",
+    title="RailPravah AI",
     version="1.0.0"
 )
 
-# Enable CORS for React Native mobile client & local testing
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,16 +16,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register routes
 app.include_router(eta_router)
 app.include_router(ws_router)
 
 @app.on_event("startup")
 def on_startup():
-    print("=" * 60)
-    print("🚀 Starting RailPravah AI Engine...")
     init_ml_engine()
-    print("=" * 60)
 
 @app.get("/")
 def root():
@@ -37,6 +31,9 @@ def root():
         "endpoints": {
             "health": "/api/health",
             "search": "/api/trains/search?q={query}",
+            "route": "/api/trains/route?from_stn={from}&to_stn={to}",
+            "stations": "/api/stations/search?q={query}",
+            "pnr": "/api/pnr/{pnr_no}",
             "eta": "/api/train/{train_no}/eta",
             "station_board": "/api/station/{station_code}/board",
             "stream": "/api/train/{train_no}/stream",

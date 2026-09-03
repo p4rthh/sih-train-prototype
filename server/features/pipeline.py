@@ -32,10 +32,6 @@ FEATURE_NAMES = [
 ]
 
 class FeaturePipeline:
-    """
-    Transforms raw operational telemetry, timetable metadata, and live weather
-    into a standardized 25-feature vector for LightGBM inference and training.
-    """
     @classmethod
     def extract_features(cls, state: Dict[str, Any], weather: Dict[str, Any], dt: Optional[datetime.datetime] = None) -> pd.DataFrame:
         if dt is None:
@@ -49,14 +45,12 @@ class FeaturePipeline:
         curr_delay = float(state.get("current_delay_min", 0.0))
         delays = state.get("delay_history", [curr_delay])
 
-        # Lags
         lag_1 = float(delays[-2]) if len(delays) >= 2 else curr_delay
         lag_2 = float(delays[-3]) if len(delays) >= 3 else lag_1
         lag_5 = float(delays[-6]) if len(delays) >= 6 else lag_2
 
         delay_delta = curr_delay - lag_1
 
-        # Rolling trend
         if len(delays) >= 3:
             recent_deltas = [delays[i] - delays[i-1] for i in range(max(1, len(delays)-3), len(delays))]
             rolling_trend = sum(recent_deltas) / len(recent_deltas)
@@ -101,5 +95,4 @@ class FeaturePipeline:
             "is_loco_reversal": is_reversal
         }
 
-        # Return DataFrame with strict feature order
         return pd.DataFrame([row])[FEATURE_NAMES]

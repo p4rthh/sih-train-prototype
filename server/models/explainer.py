@@ -4,18 +4,10 @@ from typing import List, Dict, Any
 from server.features.pipeline import FEATURE_NAMES
 
 class DelayReasonEngine:
-    """
-    Translates Tree-SHAP feature importance scores into human-readable,
-    emoji-tagged plain English delay reason cards in < 5ms.
-    """
     def __init__(self, lightgbm_point_model):
         self.explainer = shap.TreeExplainer(lightgbm_point_model)
 
     def explain(self, features_df: pd.DataFrame) -> List[Dict[str, Any]]:
-        """
-        Computes local SHAP values for the given feature row and maps
-        the highest positive delay drivers into user-friendly explanations.
-        """
         X = features_df[FEATURE_NAMES]
         shap_vals = self.explainer.shap_values(X)
         if isinstance(shap_vals, list):
@@ -24,7 +16,6 @@ class DelayReasonEngine:
         row = X.iloc[0]
         vals = shap_vals[0] if len(shap_vals.shape) > 1 else shap_vals
 
-        # Pair each feature with its value and SHAP impact
         impacts = []
         for feat, val, s in zip(FEATURE_NAMES, row, vals):
             impacts.append({
@@ -33,7 +24,6 @@ class DelayReasonEngine:
                 "shap_impact": float(s)
             })
 
-        # Filter features that increased delay (positive impact)
         positive_drivers = [item for item in impacts if item["shap_impact"] > 0.3]
         positive_drivers.sort(key=lambda x: x["shap_impact"], reverse=True)
 

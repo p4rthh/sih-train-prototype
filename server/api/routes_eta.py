@@ -19,36 +19,27 @@ from server.api.schemas import (
 
 router = APIRouter(prefix="/api", tags=["Train & ETA"])
 
-# Shared singletons across API routes
 weather_client = WeatherClient()
 ml_model = DelayLightGBM()
 cqr_calibrator = ConformalCalibrator()
 shap_explainer: Optional[DelayReasonEngine] = None
 
-# In-memory pool of active train simulators
 ACTIVE_SIMULATORS: Dict[str, TrainSimulator] = {}
 SIMULATOR_LAST_TICK: Dict[str, datetime.datetime] = {}
 SIMULATOR_SOURCE: Dict[str, str] = {}
 SIMULATOR_DESC: Dict[str, Optional[str]] = {}
 
 def init_ml_engine():
-    """Loads trained ML models into memory."""
     global shap_explainer
     if ml_model.load():
         cqr_calibrator.load()
         shap_explainer = DelayReasonEngine(ml_model.point_model)
-        print("[API] ML Models, CQR Calibrator, and SHAP Explainer successfully loaded.")
-    else:
-        print("[API Warning] Pre-trained models not found. Please train models using 03_train_model.py.")
 
-# Auto-initialize on import
 init_ml_engine()
 
-# Indian Standard Time (IST = UTC+5:30)
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 
 def parse_schedule_time(time_str: Optional[str], day_offset: int = 1, base_date: Optional[datetime.date] = None) -> Optional[datetime.datetime]:
-    """Converts timetable time string (HH:MM:SS) into timezone-aware IST datetime."""
     if not time_str or str(time_str).strip() in ["None", "START", "--", ""]:
         return None
     try:
@@ -62,7 +53,6 @@ def parse_schedule_time(time_str: Optional[str], day_offset: int = 1, base_date:
         return None
 
 def get_or_create_simulator(train_no: str) -> TrainSimulator:
-    """Retrieves or spins up a kinematic simulator anchored to real-time NTES ground truth."""
     t_no = str(train_no).strip()
     now_ist = datetime.datetime.now(IST)
 
@@ -73,7 +63,6 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
         
         sim = TrainSimulator(t_no, schedule)
 
-        # 1. Attempt real-time ground truth anchor from NTES
         anchor = get_live_ntes_anchor(t_no)
         if anchor and anchor.get("last_station_code"):
             stn = anchor["last_station_code"]
@@ -84,7 +73,6 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
             SIMULATOR_SOURCE[t_no] = "NTES_REALTIME"
             SIMULATOR_DESC[t_no] = anchor.get("position_desc") or f"Live at {stn} (+{int(del_m)}m delay)"
         else:
-            # 2. Time-of-day scheduled real-time sync
             synced = sim.sync_to_current_time()
             if not synced and len(sim.route_stops) > 4:
                 sim.current_stop_idx = 1
@@ -102,7 +90,6 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
     last_tick = SIMULATOR_LAST_TICK.get(t_no, now_ist)
     elapsed_sec = max(1.0, min(120.0, (now_ist - last_tick).total_seconds()))
 
-    # Keep anchored to latest NTES updates if station moved
     anchor = get_live_ntes_anchor(t_no)
     if anchor and anchor.get("last_station_code"):
         curr_code = sim.route_stops[min(sim.current_stop_idx, len(sim.route_stops)-1)]["station_code"].upper()
@@ -111,7 +98,6 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
             SIMULATOR_SOURCE[t_no] = "NTES_REALTIME"
             SIMULATOR_DESC[t_no] = anchor.get("position_desc") or f"Live at {anchor['last_station_code']}"
     
-    # Tick simulation forward based on real elapsed time
     curr_stn = sim.route_stops[min(sim.current_stop_idx, len(sim.route_stops) - 1)]["station_code"]
     weather = weather_client.get_weather(curr_stn, sim.current_lat, sim.current_lon)
     sim.tick(elapsed_sec, weather.get("visibility_m", 10000.0), weather.get("precipitation_mm", 0.0))
@@ -119,14 +105,12 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
     return sim
 
 @router.get("/trains/search", response_model=List[TrainSearchResult])
-def search_trains_endpoint(q: str = Query(..., min_length=1, description="Train number or name prefix")):
-    """Search trains by number or name."""
+def search_trains_endpoint(q: str = Query(..., min_length=1)):
     results = search_trains(q, limit=20)
     return [TrainSearchResult(train_number=r["train_number"], train_name=r["train_name"]) for r in results]
 
 @router.get("/stations/search", response_model=List[StationSearchResult])
-def search_stations_endpoint(q: str = Query(..., min_length=1, description="Station code or name prefix")):
-    """Search 8,990+ stations across India by code or name."""
+def search_stations_endpoint(q: str = Query(..., min_length=1)):
     results = search_stations(q, limit=20)
     return [StationSearchResult(
         station_code=r["station_code"],
@@ -137,25 +121,22 @@ def search_stations_endpoint(q: str = Query(..., min_length=1, description="Stat
 
 @router.get("/pnr/{pnr_no}", response_model=PNRResponse)
 def get_pnr_status_endpoint(pnr_no: str):
-    """Resolve 10-digit Indian Railways PNR and link to live train tracking."""
     res = resolve_pnr_status(pnr_no)
     if not res:
-        raise HTTPException(status_code=400, detail="Invalid 10-digit PNR number. Please enter a valid 10-digit PNR.")
+        raise HTTPException(status_code=400, detail="Invalid 10-digit PNR number.")
     return PNRResponse(**res)
 
 @router.get("/trains/route", response_model=List[RouteSearchResultItem])
 def search_trains_route_endpoint(
-    from_stn: str = Query(..., description="Origin station code or name (e.g. NDLS or New Delhi)"),
-    to_stn: str = Query(..., description="Destination station code or name (e.g. BCT or Mumbai Central)"),
-    express_only: bool = Query(True, description="Filter for Express/Superfast/Mail coaching trains only")
+    from_stn: str = Query(...),
+    to_stn: str = Query(...),
+    express_only: bool = Query(True)
 ):
-    """Find all express trains running between origin and destination stations ordered by departure."""
     results = find_trains_between_stations(from_stn, to_stn, express_only=express_only, limit=100)
     return [RouteSearchResultItem(**r) for r in results]
 
 @router.get("/train/{train_no}/schedule")
 def get_schedule_endpoint(train_no: str):
-    """Retrieve full stop sequence and station coordinates for a train."""
     schedule = get_train_schedule(train_no)
     if not schedule:
         raise HTTPException(status_code=404, detail=f"Train #{train_no} not found")
@@ -167,21 +148,14 @@ def get_schedule_endpoint(train_no: str):
 
 @router.get("/train/{train_no}/eta", response_model=ETAResponse)
 def get_train_eta_endpoint(train_no: str):
-    """
-    Computes dynamic point ETA, CQR calibrated 90% arrival window,
-    and SHAP explainable delay reasons.
-    """
     sim = get_or_create_simulator(train_no)
     state = sim.get_state()
 
-    # 1. Fetch live weather at train's current station
     stn_code = state["current_station_code"]
     weather = weather_client.get_weather(stn_code, state["lat"], state["lon"])
 
-    # 2. Extract 25-feature vector
     feat_df = FeaturePipeline.extract_features(state, weather)
 
-    # 3. Model Inference (LightGBM + CQR)
     curr_delay = state["current_delay_min"]
     if ml_model.is_fitted:
         preds = ml_model.predict(feat_df)
@@ -191,12 +165,10 @@ def get_train_eta_endpoint(train_no: str):
         window_lower_min = max(0.0, curr_delay + low_delta)
         window_upper_min = max(window_lower_min + 2.0, curr_delay + high_delta)
     else:
-        # Fallback if models not yet compiled
         forecasted_delay = curr_delay + 4.0
         window_lower_min = curr_delay + 1.0
         window_upper_min = curr_delay + 9.0
 
-    # 4. Generate SHAP Delay Reasons
     if shap_explainer and ml_model.is_fitted:
         reasons_list = shap_explainer.explain(feat_df)
     else:
@@ -206,19 +178,16 @@ def get_train_eta_endpoint(train_no: str):
             "impact_min": 0.0
         }]
 
-    # 5. Compute Arrival Times in Indian Standard Time (IST)
     now_ist = datetime.datetime.now(IST)
     nxt_stop = sim.route_stops[min(state["current_stop_idx"] + 1, len(sim.route_stops) - 1)]
     sched_str = nxt_stop.get("arrival") or nxt_stop.get("departure") or "--:--"
 
-    # Calculate physical transit time along block section
     sec_dist = float(nxt_stop.get("section_km") or 15.0)
     rem_dist = max(0.5, sec_dist - sim.section_dist_covered_km)
     curr_speed = float(state["speed_kmh"])
     eff_speed = curr_speed if curr_speed >= 35.0 else max(40.0, sim.max_speed_kmh * 0.75)
     transit_mins = (rem_dist / eff_speed) * 60.0
 
-    # Scheduled arrival datetime
     sched_dt = parse_schedule_time(sched_str, nxt_stop.get("day", 1), now_ist.date())
     
     if sched_dt is not None:
@@ -226,17 +195,14 @@ def get_train_eta_endpoint(train_no: str):
             sched_dt += datetime.timedelta(days=1)
         eta_from_schedule = sched_dt + datetime.timedelta(minutes=forecasted_delay)
         eta_from_kinematics = now_ist + datetime.timedelta(minutes=transit_mins)
-        # ETA must physically be at least now_ist + transit time
         point_eta_dt = max(eta_from_schedule, eta_from_kinematics)
     else:
         point_eta_dt = now_ist + datetime.timedelta(minutes=max(3.0, transit_mins + (preds["point_delta"] if ml_model.is_fitted else 2.0)))
 
-    # Conformal 90% arrival window
     cqr_margin = max(2.0, cqr_calibrator.q_hat if cqr_calibrator.q_hat > 0 else 3.0)
     lower_eta_dt = max(now_ist + datetime.timedelta(minutes=1.0), point_eta_dt - datetime.timedelta(minutes=cqr_margin))
     upper_eta_dt = point_eta_dt + datetime.timedelta(minutes=cqr_margin + 2.0)
 
-    # 6. Build route timeline progress with chronological arrival progression
     route_progress = []
     prev_milestone_dt = point_eta_dt
 
@@ -312,7 +278,6 @@ def get_train_eta_endpoint(train_no: str):
 
 @router.get("/station/{station_code}/board", response_model=List[StationBoardItem])
 def get_station_board_endpoint(station_code: str, express_only: bool = Query(True)):
-    """Lists upcoming express trains at a station with live ETAs in IST."""
     stn = resolve_station_code(station_code.strip())
     now_ist = datetime.datetime.now(IST)
     conn = get_db_connection()

@@ -6,31 +6,20 @@ from server.config import OPEN_METEO_FORECAST_URL, OPEN_METEO_ARCHIVE_URL
 from server.database import get_db_connection
 
 class WeatherClient:
-    """
-    Fetches real hourly atmospheric conditions from Open-Meteo.
-    Caches results in SQLite to prevent duplicate API queries.
-    """
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "SIH-Train-Platform/1.0"})
 
     def get_weather(self, station_code: str, lat: float, lon: float, dt: Optional[datetime.datetime] = None) -> Dict[str, Any]:
-        """
-        Retrieves weather parameters for a given station and time.
-        First checks SQLite cache, then queries Open-Meteo.
-        """
         if dt is None:
-            dt = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30))) # IST
+            dt = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
         
-        # Hourly bucket string: YYYY-MM-DDTHH:00
         hour_bucket = dt.strftime("%Y-%m-%dT%H:00")
         
-        # Check SQLite cache
         cached = self._get_cached_weather(station_code, hour_bucket)
         if cached:
             return cached
 
-        # Query Open-Meteo live forecast
         try:
             params = {
                 "latitude": round(lat, 4),
@@ -45,7 +34,6 @@ class WeatherClient:
                 hourly = data.get("hourly", {})
                 times = hourly.get("time", [])
                 
-                # Find closest matching hour
                 idx = 0
                 for i, t_str in enumerate(times):
                     if t_str >= hour_bucket:
@@ -72,17 +60,12 @@ class WeatherClient:
                 self._cache_weather(record)
                 return record
 
-        except Exception as e:
-            # Safe operational fallback if network request fails
+        except Exception:
             pass
 
         return self._get_default_weather(station_code, hour_bucket)
 
     def calculate_fog_severity(self, visibility_m: float) -> float:
-        """
-        Normalized Fog Severity Index [0.0, 1.0].
-        IR Rule: Visibility < 200m triggers 30 km/h speed limit.
-        """
         if visibility_m >= 1000.0:
             return 0.0
         elif visibility_m <= 100.0:
@@ -125,7 +108,6 @@ class WeatherClient:
         conn.close()
 
     def _get_default_weather(self, station_code: str, timestamp: str) -> Dict[str, Any]:
-        """Provides realistic nominal weather conditions."""
         return {
             "station_code": station_code,
             "timestamp": timestamp,

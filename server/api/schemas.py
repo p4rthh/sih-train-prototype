@@ -15,14 +15,14 @@ class DynamicETA(BaseModel):
 
 class DelayReason(BaseModel):
     reason: str
-    severity: str # "HIGH", "MEDIUM", "LOW"
+    severity: str
     impact_min: float
 
 class RouteStop(BaseModel):
     seq: int
     station_code: str
     station_name: str
-    status: str # "departed", "current", "upcoming"
+    status: str
     scheduled_arrival: Optional[str] = None
     scheduled_departure: Optional[str] = None
     delay_min: Optional[float] = None

@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 
-# Paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
@@ -20,7 +19,6 @@ Q10_MODEL_PATH = MODELS_DIR / "lgb_q10.pkl"
 Q90_MODEL_PATH = MODELS_DIR / "lgb_q90.pkl"
 CQR_PARAMS_PATH = MODELS_DIR / "cqr_params.json"
 
-# API Endpoints
 DATAMEET_SCHEDULES_URL = "https://raw.githubusercontent.com/datameet/railways/master/schedules.json"
 DATAMEET_STATIONS_URL = "https://raw.githubusercontent.com/datameet/railways/master/stations.json"
 DATAMEET_TRAINS_URL = "https://raw.githubusercontent.com/datameet/railways/master/trains.json"
@@ -28,17 +26,7 @@ DATAMEET_TRAINS_URL = "https://raw.githubusercontent.com/datameet/railways/maste
 OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 OPEN_METEO_ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 
-# Train Priority mapping based on train number and name keywords
 def get_train_priority(train_no: str, train_name: str = "") -> int:
-    """
-    Returns priority rank 1 (highest) to 6 (lowest).
-    Rank 1: Vande Bharat, Rajdhani, Shatabdi, Tejas, Duronto
-    Rank 2: Superfast Express / Sampark Kranti / Humsafar
-    Rank 3: Mail / Express / Intercity
-    Rank 4: Garib Rath / Jan Shatabdi
-    Rank 5: Passenger / MEMU / DEMU
-    Rank 6: Freight
-    """
     name_upper = train_name.upper()
     if any(k in name_upper for k in ["VANDE BHARAT", "RAJDHANI", "SHATABDI", "TEJAS", "DURONTO"]):
         return 1
@@ -50,14 +38,12 @@ def get_train_priority(train_no: str, train_name: str = "") -> int:
         return 5
     if any(k in name_upper for k in ["GOODS", "FREIGHT"]):
         return 6
-    # Fallback by train number prefixes
     t_num = str(train_no).strip()
     if t_num.startswith("22") or t_num.startswith("12"):
-        return 2 # Superfast prefix
-    return 3 # Default Mail/Express
+        return 2
+    return 3
 
-# Operational Constants
 DEFAULT_MPS_KMH = 110.0
-FOG_SEVERE_THRESHOLD_M = 200.0   # Speed capped at 30 km/h
-FOG_MODERATE_THRESHOLD_M = 500.0 # Speed capped at 60 km/h
-RAIN_HEAVY_THRESHOLD_MM = 15.0   # Speed restriction for track flooding
+FOG_SEVERE_THRESHOLD_M = 200.0
+FOG_MODERATE_THRESHOLD_M = 500.0
+RAIN_HEAVY_THRESHOLD_MM = 15.0

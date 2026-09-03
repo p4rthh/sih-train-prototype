@@ -3,13 +3,11 @@ from typing import List, Dict, Optional, Any
 from server.config import DB_PATH
 
 def get_db_connection() -> sqlite3.Connection:
-    """Returns a connection to the SQLite database with Row factory."""
     conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    """Initializes the database schema and indexes."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -55,10 +53,8 @@ def init_db():
 
     conn.commit()
     conn.close()
-    print(f"[DB] Initialized database schema at {DB_PATH}")
 
 def search_trains(query: str, limit: int = 15) -> List[Dict[str, Any]]:
-    """Search trains by train number or train name prefix/substring."""
     conn = get_db_connection()
     cursor = conn.cursor()
     q = f"%{query.strip()}%"
@@ -76,7 +72,6 @@ def search_trains(query: str, limit: int = 15) -> List[Dict[str, Any]]:
     return [{"train_number": r["train_number"], "train_name": r["train_name"]} for r in rows]
 
 def get_train_schedule(train_no: str) -> List[Dict[str, Any]]:
-    """Retrieve ordered stop schedule for a train, joining station coordinates."""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -101,7 +96,6 @@ def get_train_schedule(train_no: str) -> List[Dict[str, Any]]:
     return [dict(r) for r in rows]
 
 def get_station_info(station_code: str) -> Optional[Dict[str, Any]]:
-    """Retrieve station metadata and coordinates."""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM stations WHERE station_code = ?", (station_code.strip().upper(),))
@@ -110,7 +104,6 @@ def get_station_info(station_code: str) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 def search_stations(query: str, limit: int = 20) -> List[Dict[str, Any]]:
-    """Search stations across India by code or name."""
     conn = get_db_connection()
     cursor = conn.cursor()
     q_clean = query.strip().upper()
@@ -135,25 +128,21 @@ def search_stations(query: str, limit: int = 20) -> List[Dict[str, Any]]:
     return [dict(r) for r in rows]
 
 def resolve_station_code(query: str) -> str:
-    """Resolves station code from code or station name (e.g. 'New Delhi' -> 'NDLS')."""
     if not query:
         return ""
     conn = get_db_connection()
     c = conn.cursor()
     q = query.strip().upper()
-    # 1. Exact match code
     c.execute("SELECT station_code FROM stations WHERE station_code = ?", (q,))
     row = c.fetchone()
     if row:
         conn.close()
         return row["station_code"]
-    # 2. Exact match name
     c.execute("SELECT station_code FROM stations WHERE UPPER(station_name) = ?", (q,))
     row = c.fetchone()
     if row:
         conn.close()
         return row["station_code"]
-    # 3. Fuzzy search major junction / central
     c.execute("""
         SELECT station_code FROM stations 
         WHERE station_name LIKE ? 
@@ -166,7 +155,6 @@ def resolve_station_code(query: str) -> str:
     return row["station_code"] if row else q
 
 def find_trains_between_stations(from_stn: str, to_stn: str, express_only: bool = True, limit: int = 100) -> List[Dict[str, Any]]:
-    """Finds all express trains running from origin to destination station ordered by departure time."""
     conn = get_db_connection()
     cursor = conn.cursor()
     from_code = resolve_station_code(from_stn)
@@ -194,7 +182,6 @@ def find_trains_between_stations(from_stn: str, to_stn: str, express_only: bool 
           AND s1.seq < s2.seq
     """
     
-    # Filter for Pan-India Express trains only
     if express_only:
         sql += """
           AND s1.train_name NOT LIKE '%Passenger%'
