@@ -1,4 +1,4 @@
-# RailPravah AI (रेल प्रवाह)
+# NavaRail
 Dynamic train arrival forecasting and explainable delay engine for Indian Railways.
 
 ---

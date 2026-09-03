@@ -4,7 +4,7 @@ from server.api.routes_eta import router as eta_router, init_ml_engine
 from server.api.routes_ws import router as ws_router
 
 app = FastAPI(
-    title="RailPravah AI",
+    title="NavaRail",
     version="1.0.0"
 )
 
@@ -27,7 +27,7 @@ def on_startup():
 def root():
     return {
         "status": "online",
-        "service": "RailPravah AI Dynamic ETA Platform",
+        "service": "NavaRail Dynamic ETA Platform",
         "endpoints": {
             "health": "/api/health",
             "search": "/api/trains/search?q={query}",
@@ -45,7 +45,7 @@ def root():
 def health_check():
     return {
         "status": "healthy",
-        "service": "RailPravah AI Dynamic ETA Platform",
+        "service": "NavaRail Dynamic ETA Platform",
         "version": "1.0.0"
     }
 

@@ -40,7 +40,7 @@ export default function App() {
             <View style={styles.headerTitleRow}>
               <Text style={styles.headerIcon}>🚆</Text>
               <View>
-                <Text style={styles.headerBrand}>RailPravah AI</Text>
+                <Text style={styles.headerBrand}>NavaRail</Text>
                 <Text style={styles.headerSub}>Dynamic ETA & Explainable Delay Engine</Text>
               </View>
             </View>
