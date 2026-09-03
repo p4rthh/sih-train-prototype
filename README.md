@@ -4,6 +4,7 @@ Dynamic train arrival forecasting and explainable delay engine for Indian Railwa
 ---
 
 ## Features
+- **Dual-Tier Ensemble Architecture (Model A + Model B):** Combines LightGBM section tabular kinematics with a Spatio-Temporal Graph Convolutional Network (ST-GCN) that performs graph message passing across corridor stations to capture network-wide cascading delay contagion.
 - **Statistical Arrival Intervals (CQR):** Replaces static single-point estimates with calibrated arrival windows using Conformalized Quantile Regression.
 - **Delay Root-Cause Attribution:** Uses Tree-SHAP to extract operational, weather, and congestion drivers (dense fog, single-track meets, preceding delayed trains, engine reversals).
 - **Kinematic Simulation & NTES Anchoring:** Real-time continuous speed and coordinate tracking along track geometry with live NTES status fallback.
@@ -17,25 +18,30 @@ Dynamic train arrival forecasting and explainable delay engine for Indian Railwa
 ```
 [Pan-India Schedules (SQLite)] + [Open-Meteo Weather] + [Kinematic Simulator / NTES]
                                │
+               ┌───────────────┴───────────────┐
+               ▼                               ▼
+   [25-Feature Tabular Pipeline]      [Spatio-Temporal Graph Tensor]
+               │                               │
+               ▼                               ▼
+   [Model A: LightGBM Estimator]      [Model B: Railway ST-GCN Network]
+   (Section Speed & Dwell Deviations) (Corridor Graph Cascading Contagion)
+               │                               │
+               └───────────────┬───────────────┘
                                ▼
-                   [25-Feature Vector Pipeline]
+                   [Stacking Meta-Learner]
+               (Ridge Adaptive Hybrid Blend)
+                               │
+               ┌───────────────┴───────────────┐
+               ▼                               ▼
+     [Conformal UQ (90%)]            [Tree-SHAP Explainer]
+     (Calibrated [14:32 – 14:47])    ("Dense Fog 110m")
+               │                               │
+               └───────────────┬───────────────┘
+                               ▼
+                 [FastAPI REST & WebSocket Server]
                                │
                                ▼
-         ┌──────────────────────────────────────────────┐
-         │ Model A: LightGBM (Point, q10, q90 Quantiles)│
-         └──────────────────────┬───────────────────────┘
-                                │
-             ┌──────────────────┴──────────────────┐
-             ▼                                     ▼
-   [Conformal UQ (90%)]                  [Tree-SHAP Explainer]
-   (Calibrated [14:32 – 14:47])          ("Dense Fog 110m")
-             │                                     │
-             └──────────────────┬──────────────────┘
-                                ▼
-                   [FastAPI REST & WebSocket Server]
-                                │
-                                ▼
-                  [React Native Mobile App (Expo)]
+                [React Native Mobile App (Expo)]
 ```
 
 ---

@@ -1,0 +1,5 @@
+{
+  "weight_lgb": 0.62,
+  "weight_stgcn": 0.38,
+  "bias": 0.0
+}

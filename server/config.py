@@ -18,6 +18,8 @@ POINT_MODEL_PATH = MODELS_DIR / "lgb_point.pkl"
 Q10_MODEL_PATH = MODELS_DIR / "lgb_q10.pkl"
 Q90_MODEL_PATH = MODELS_DIR / "lgb_q90.pkl"
 CQR_PARAMS_PATH = MODELS_DIR / "cqr_params.json"
+STGCN_MODEL_PATH = MODELS_DIR / "stgcn.pt"
+ENSEMBLE_PARAMS_PATH = MODELS_DIR / "ensemble_weights.json"
 
 DATAMEET_SCHEDULES_URL = "https://raw.githubusercontent.com/datameet/railways/master/schedules.json"
 DATAMEET_STATIONS_URL = "https://raw.githubusercontent.com/datameet/railways/master/stations.json"

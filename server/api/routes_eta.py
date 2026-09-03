@@ -9,6 +9,8 @@ from server.ingestion.pnr_resolver import resolve_pnr_status
 from server.simulator.kinematic_engine import TrainSimulator
 from server.features.pipeline import FeaturePipeline
 from server.models.lightgbm_model import DelayLightGBM
+from server.models.stgcn_model import DelaySTGCN
+from server.models.ensemble import StackingEnsemble
 from server.models.conformal_uq import ConformalCalibrator
 from server.models.explainer import DelayReasonEngine
 from server.api.schemas import (
@@ -21,6 +23,8 @@ router = APIRouter(prefix="/api", tags=["Train & ETA"])
 
 weather_client = WeatherClient()
 ml_model = DelayLightGBM()
+stgcn_model = DelaySTGCN()
+stacking_ensemble = StackingEnsemble()
 cqr_calibrator = ConformalCalibrator()
 shap_explainer: Optional[DelayReasonEngine] = None
 
@@ -32,6 +36,8 @@ SIMULATOR_DESC: Dict[str, Optional[str]] = {}
 def init_ml_engine():
     global shap_explainer
     if ml_model.load():
+        stgcn_model.load()
+        stacking_ensemble.load()
         cqr_calibrator.load()
         shap_explainer = DelayReasonEngine(ml_model.point_model)
 
@@ -157,9 +163,22 @@ def get_train_eta_endpoint(train_no: str):
     feat_df = FeaturePipeline.extract_features(state, weather)
 
     curr_delay = state["current_delay_min"]
+    pred_delta_stgcn = 0.0
     if ml_model.is_fitted:
         preds = ml_model.predict(feat_df)
-        pred_delta = preds["point_delta"]
+        pred_delta_lgb = preds["point_delta"]
+
+        if stgcn_model.is_fitted:
+            pred_delta_stgcn = stgcn_model.predict(
+                sim.route_stops,
+                state["current_stop_idx"],
+                state["delay_history"],
+                weather
+            )
+        else:
+            pred_delta_stgcn = pred_delta_lgb
+
+        pred_delta = stacking_ensemble.predict_delta(pred_delta_lgb, pred_delta_stgcn, hop_dist=1)
         forecasted_delay = max(0.0, curr_delay + pred_delta)
         low_delta, high_delta = cqr_calibrator.predict_interval(preds["q10_delta"], preds["q90_delta"])
         window_lower_min = max(0.0, curr_delay + low_delta)
@@ -197,7 +216,7 @@ def get_train_eta_endpoint(train_no: str):
         eta_from_kinematics = now_ist + datetime.timedelta(minutes=transit_mins)
         point_eta_dt = max(eta_from_schedule, eta_from_kinematics)
     else:
-        point_eta_dt = now_ist + datetime.timedelta(minutes=max(3.0, transit_mins + (preds["point_delta"] if ml_model.is_fitted else 2.0)))
+        point_eta_dt = now_ist + datetime.timedelta(minutes=max(3.0, transit_mins + (pred_delta if ml_model.is_fitted else 2.0)))
 
     cqr_margin = max(2.0, cqr_calibrator.q_hat if cqr_calibrator.q_hat > 0 else 3.0)
     lower_eta_dt = max(now_ist + datetime.timedelta(minutes=1.0), point_eta_dt - datetime.timedelta(minutes=cqr_margin))
@@ -222,13 +241,19 @@ def get_train_eta_endpoint(train_no: str):
             prev_milestone_dt = point_eta_dt
         else:
             status = "upcoming"
-            d_min = forecasted_delay
+            hop_hops = idx - state["current_stop_idx"]
+            multihop_delta = stacking_ensemble.predict_delta(
+                preds["point_delta"] if ml_model.is_fitted else 2.0,
+                pred_delta_stgcn,
+                hop_dist=hop_hops
+            )
+            d_min = max(0.0, curr_delay + multihop_delta)
             stn_sched_str = stop.get("arrival") or stop.get("departure")
             s_dt = parse_schedule_time(stn_sched_str, stop.get("day", 1), now_ist.date())
             if s_dt is not None:
                 if s_dt < now_ist - datetime.timedelta(hours=8):
                     s_dt += datetime.timedelta(days=1)
-                cand_dt = s_dt + datetime.timedelta(minutes=forecasted_delay)
+                cand_dt = s_dt + datetime.timedelta(minutes=d_min)
                 stop_eta_dt = max(prev_milestone_dt + datetime.timedelta(minutes=3.0), cand_dt)
             else:
                 inter_km = float(stop.get("section_km") or 15.0)
@@ -273,7 +298,9 @@ def get_train_eta_endpoint(train_no: str):
         delay_reasons=[DelayReason(**r) for r in reasons_list],
         route_progress=route_progress,
         telemetry_source=SIMULATOR_SOURCE.get(sim.train_no, "NTES_REALTIME"),
-        live_position_desc=SIMULATOR_DESC.get(sim.train_no)
+        live_position_desc=SIMULATOR_DESC.get(sim.train_no),
+        model_b_stgcn_delta=round(pred_delta_stgcn, 2),
+        ensemble_blend_ratio=f"{int(stacking_ensemble.w_lgb * 100)}% LightGBM + {int(stacking_ensemble.w_stgcn * 100)}% ST-GCN"
     )
 
 @router.get("/station/{station_code}/board", response_model=List[StationBoardItem])

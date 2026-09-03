@@ -50,6 +50,8 @@ export interface ETAResponse {
   route_progress: RouteStop[];
   telemetry_source?: string;
   live_position_desc?: string;
+  model_b_stgcn_delta?: number;
+  ensemble_blend_ratio?: string;
 }
 
 export interface StationBoardItem {

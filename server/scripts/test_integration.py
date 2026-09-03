@@ -21,6 +21,8 @@ async def test_full_integration():
     assert r.status_code == 200, "ETA endpoint failed"
     eta_data = r.json()
     assert "dynamic_eta" in eta_data
+    assert "model_b_stgcn_delta" in eta_data
+    assert "ensemble_blend_ratio" in eta_data
 
     r = client.get("/api/station/NDLS/board")
     assert r.status_code == 200 and len(r.json()) > 0, "Station board failed"

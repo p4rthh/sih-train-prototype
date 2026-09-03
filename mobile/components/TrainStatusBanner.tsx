@@ -77,6 +77,18 @@ export const TrainStatusBanner: React.FC<Props> = ({ data, isConnected }) => {
         </View>
       )}
 
+      {/* Model B ST-GCN + Model A Ensemble Badge */}
+      <View style={styles.ensembleRow}>
+        <View style={styles.ensembleTag}>
+          <Text style={styles.ensembleTagText}>⚡ ST-GCN + LightGBM Ensemble</Text>
+        </View>
+        {data.model_b_stgcn_delta !== undefined && (
+          <Text style={styles.modelBText}>
+            Graph Cascade: {data.model_b_stgcn_delta >= 0 ? `+${data.model_b_stgcn_delta}` : data.model_b_stgcn_delta}m
+          </Text>
+        )}
+      </View>
+
       {/* Streaming Health Dot */}
       <View style={styles.footerRow}>
         <View style={styles.streamIndicator}>
@@ -240,5 +252,32 @@ const styles = StyleSheet.create({
     color: "#93c5fd",
     fontWeight: "600",
     flex: 1,
+  },
+  ensembleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "rgba(139, 92, 246, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(167, 139, 250, 0.3)",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginBottom: 10,
+  },
+  ensembleTag: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  ensembleTagText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#c4b5fd",
+    letterSpacing: 0.5,
+  },
+  modelBText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#a78bfa",
   },
 });

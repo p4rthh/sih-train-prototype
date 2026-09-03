@@ -48,6 +48,8 @@ class ETAResponse(BaseModel):
     route_progress: List[RouteStop]
     telemetry_source: Optional[str] = "NTES_REALTIME"
     live_position_desc: Optional[str] = None
+    model_b_stgcn_delta: Optional[float] = None
+    ensemble_blend_ratio: Optional[str] = "62% LightGBM + 38% ST-GCN"
 
 class StationBoardItem(BaseModel):
     train_number: str
