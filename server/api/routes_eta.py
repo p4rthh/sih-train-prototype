@@ -42,10 +42,27 @@ def init_ml_engine():
 # Auto-initialize on import
 init_ml_engine()
 
+# Indian Standard Time (IST = UTC+5:30)
+IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+
+def parse_schedule_time(time_str: Optional[str], day_offset: int = 1, base_date: Optional[datetime.date] = None) -> Optional[datetime.datetime]:
+    """Converts timetable time string (HH:MM:SS) into timezone-aware IST datetime."""
+    if not time_str or str(time_str).strip() in ["None", "START", "--", ""]:
+        return None
+    try:
+        parts = str(time_str).strip().split(":")
+        h, m = int(parts[0]), int(parts[1])
+        if base_date is None:
+            base_date = datetime.datetime.now(IST).date()
+        st_date = base_date + datetime.timedelta(days=max(0, int(day_offset or 1) - 1))
+        return datetime.datetime(st_date.year, st_date.month, st_date.day, h, m, tzinfo=IST)
+    except Exception:
+        return None
+
 def get_or_create_simulator(train_no: str) -> TrainSimulator:
     """Retrieves or spins up a kinematic simulator anchored to real-time NTES ground truth."""
     t_no = str(train_no).strip()
-    now = datetime.datetime.now()
+    now_ist = datetime.datetime.now(IST)
 
     if t_no not in ACTIVE_SIMULATORS:
         schedule = get_train_schedule(t_no)
@@ -76,18 +93,27 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
             SIMULATOR_DESC[t_no] = "Synchronized to timetable operational schedule"
 
         ACTIVE_SIMULATORS[t_no] = sim
-        SIMULATOR_LAST_TICK[t_no] = now
+        SIMULATOR_LAST_TICK[t_no] = now_ist
         return sim
 
     sim = ACTIVE_SIMULATORS[t_no]
-    last_tick = SIMULATOR_LAST_TICK.get(t_no, now)
-    elapsed_sec = max(1.0, min(120.0, (now - last_tick).total_seconds()))
+    last_tick = SIMULATOR_LAST_TICK.get(t_no, now_ist)
+    elapsed_sec = max(1.0, min(120.0, (now_ist - last_tick).total_seconds()))
+
+    # Keep anchored to latest NTES updates if station moved
+    anchor = get_live_ntes_anchor(t_no)
+    if anchor and anchor.get("last_station_code"):
+        curr_code = sim.route_stops[min(sim.current_stop_idx, len(sim.route_stops)-1)]["station_code"].upper()
+        if curr_code != anchor["last_station_code"].upper():
+            sim.anchor_to_ntes(anchor["last_station_code"], anchor["current_delay_min"])
+            SIMULATOR_SOURCE[t_no] = "NTES_REALTIME"
+            SIMULATOR_DESC[t_no] = anchor.get("position_desc") or f"Live at {anchor['last_station_code']}"
     
     # Tick simulation forward based on real elapsed time
     curr_stn = sim.route_stops[min(sim.current_stop_idx, len(sim.route_stops) - 1)]["station_code"]
     weather = weather_client.get_weather(curr_stn, sim.current_lat, sim.current_lon)
     sim.tick(elapsed_sec, weather.get("visibility_m", 10000.0), weather.get("precipitation_mm", 0.0))
-    SIMULATOR_LAST_TICK[t_no] = now
+    SIMULATOR_LAST_TICK[t_no] = now_ist
     return sim
 
 @router.get("/trains/search", response_model=List[TrainSearchResult])
@@ -158,19 +184,40 @@ def get_train_eta_endpoint(train_no: str):
             "impact_min": 0.0
         }]
 
-    # 5. Compute Arrival Times
-    now = datetime.datetime.now()
-    # Next station scheduled arrival
+    # 5. Compute Arrival Times in Indian Standard Time (IST)
+    now_ist = datetime.datetime.now(IST)
     nxt_stop = sim.route_stops[min(state["current_stop_idx"] + 1, len(sim.route_stops) - 1)]
-    sched_str = nxt_stop.get("arrival") or nxt_stop.get("departure") or "20:00:00"
-    
-    # Calculate timestamps
-    point_eta_dt = now + datetime.timedelta(minutes=max(5.0, (state["section_distance_km"]/max(20.0, state["speed_kmh"]))*60.0 + forecasted_delay))
-    lower_eta_dt = point_eta_dt - datetime.timedelta(minutes=max(2.0, (window_upper_min - window_lower_min) / 2.0))
-    upper_eta_dt = point_eta_dt + datetime.timedelta(minutes=max(3.0, (window_upper_min - window_lower_min) / 2.0))
+    sched_str = nxt_stop.get("arrival") or nxt_stop.get("departure") or "--:--"
 
-    # 6. Build route timeline progress
+    # Calculate physical transit time along block section
+    sec_dist = float(nxt_stop.get("section_km") or 15.0)
+    rem_dist = max(0.5, sec_dist - sim.section_dist_covered_km)
+    curr_speed = float(state["speed_kmh"])
+    eff_speed = curr_speed if curr_speed >= 35.0 else max(40.0, sim.max_speed_kmh * 0.75)
+    transit_mins = (rem_dist / eff_speed) * 60.0
+
+    # Scheduled arrival datetime
+    sched_dt = parse_schedule_time(sched_str, nxt_stop.get("day", 1), now_ist.date())
+    
+    if sched_dt is not None:
+        if sched_dt < now_ist - datetime.timedelta(hours=8):
+            sched_dt += datetime.timedelta(days=1)
+        eta_from_schedule = sched_dt + datetime.timedelta(minutes=forecasted_delay)
+        eta_from_kinematics = now_ist + datetime.timedelta(minutes=transit_mins)
+        # ETA must physically be at least now_ist + transit time
+        point_eta_dt = max(eta_from_schedule, eta_from_kinematics)
+    else:
+        point_eta_dt = now_ist + datetime.timedelta(minutes=max(3.0, transit_mins + (preds["point_delta"] if ml_model.is_fitted else 2.0)))
+
+    # Conformal 90% arrival window
+    cqr_margin = max(2.0, cqr_calibrator.q_hat if cqr_calibrator.q_hat > 0 else 3.0)
+    lower_eta_dt = max(now_ist + datetime.timedelta(minutes=1.0), point_eta_dt - datetime.timedelta(minutes=cqr_margin))
+    upper_eta_dt = point_eta_dt + datetime.timedelta(minutes=cqr_margin + 2.0)
+
+    # 6. Build route timeline progress with chronological arrival progression
     route_progress = []
+    prev_milestone_dt = point_eta_dt
+
     for idx, stop in enumerate(sim.route_stops):
         if idx < state["current_stop_idx"]:
             status = "departed"
@@ -180,10 +227,26 @@ def get_train_eta_endpoint(train_no: str):
             status = "current"
             d_min = curr_delay
             eta_time = "NOW"
+        elif idx == state["current_stop_idx"] + 1:
+            status = "upcoming"
+            d_min = forecasted_delay
+            eta_time = point_eta_dt.strftime("%H:%M")
+            prev_milestone_dt = point_eta_dt
         else:
             status = "upcoming"
             d_min = forecasted_delay
-            stop_eta_dt = point_eta_dt + datetime.timedelta(minutes=(idx - state["current_stop_idx"]) * 25.0)
+            stn_sched_str = stop.get("arrival") or stop.get("departure")
+            s_dt = parse_schedule_time(stn_sched_str, stop.get("day", 1), now_ist.date())
+            if s_dt is not None:
+                if s_dt < now_ist - datetime.timedelta(hours=8):
+                    s_dt += datetime.timedelta(days=1)
+                cand_dt = s_dt + datetime.timedelta(minutes=forecasted_delay)
+                stop_eta_dt = max(prev_milestone_dt + datetime.timedelta(minutes=3.0), cand_dt)
+            else:
+                inter_km = float(stop.get("section_km") or 15.0)
+                inter_mins = (inter_km / 80.0) * 60.0
+                stop_eta_dt = prev_milestone_dt + datetime.timedelta(minutes=max(4.0, inter_mins))
+            prev_milestone_dt = stop_eta_dt
             eta_time = stop_eta_dt.strftime("%H:%M")
 
         route_progress.append(RouteStop(
