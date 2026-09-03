@@ -48,6 +48,8 @@ export interface ETAResponse {
   dynamic_eta: DynamicETA;
   delay_reasons: DelayReason[];
   route_progress: RouteStop[];
+  telemetry_source?: string;
+  live_position_desc?: string;
 }
 
 export interface StationBoardItem {

@@ -46,6 +46,8 @@ class ETAResponse(BaseModel):
     dynamic_eta: DynamicETA
     delay_reasons: List[DelayReason]
     route_progress: List[RouteStop]
+    telemetry_source: Optional[str] = "NTES_REALTIME"
+    live_position_desc: Optional[str] = None
 
 class StationBoardItem(BaseModel):
     train_number: str

@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from server.database import search_trains, get_train_schedule, get_db_connection, find_trains_between_stations
 from server.ingestion.weather_client import WeatherClient
+from server.ingestion.ntes_anchor import get_live_ntes_anchor
 from server.simulator.kinematic_engine import TrainSimulator
 from server.features.pipeline import FeaturePipeline
 from server.models.lightgbm_model import DelayLightGBM
@@ -25,6 +26,8 @@ shap_explainer: Optional[DelayReasonEngine] = None
 # In-memory pool of active train simulators
 ACTIVE_SIMULATORS: Dict[str, TrainSimulator] = {}
 SIMULATOR_LAST_TICK: Dict[str, datetime.datetime] = {}
+SIMULATOR_SOURCE: Dict[str, str] = {}
+SIMULATOR_DESC: Dict[str, Optional[str]] = {}
 
 def init_ml_engine():
     """Loads trained ML models into memory."""
@@ -40,7 +43,7 @@ def init_ml_engine():
 init_ml_engine()
 
 def get_or_create_simulator(train_no: str) -> TrainSimulator:
-    """Retrieves or spins up a kinematic simulator for a train."""
+    """Retrieves or spins up a kinematic simulator anchored to real-time NTES ground truth."""
     t_no = str(train_no).strip()
     now = datetime.datetime.now()
 
@@ -49,15 +52,29 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
         if not schedule:
             raise HTTPException(status_code=404, detail=f"Train #{t_no} schedule not found in database")
         
-        # Start with realistic initial progress
-        sim = TrainSimulator(t_no, schedule, start_delay_min=8.0)
-        # Advance slightly into the route for live demonstration
-        if len(sim.route_stops) > 4:
-            sim.current_stop_idx = 1
-            sim.current_lat = sim.route_stops[1]["lat"]
-            sim.current_lon = sim.route_stops[1]["lon"]
-            sim.current_speed_kmh = 95.0
-        
+        sim = TrainSimulator(t_no, schedule)
+
+        # 1. Attempt real-time ground truth anchor from NTES
+        anchor = get_live_ntes_anchor(t_no)
+        if anchor and anchor.get("last_station_code"):
+            stn = anchor["last_station_code"]
+            del_m = anchor["current_delay_min"]
+            anchored = sim.anchor_to_ntes(stn, del_m)
+            if not anchored:
+                sim.sync_to_current_time()
+            SIMULATOR_SOURCE[t_no] = "NTES_REALTIME"
+            SIMULATOR_DESC[t_no] = anchor.get("position_desc") or f"Live at {stn} (+{int(del_m)}m delay)"
+        else:
+            # 2. Time-of-day scheduled real-time sync
+            synced = sim.sync_to_current_time()
+            if not synced and len(sim.route_stops) > 4:
+                sim.current_stop_idx = 1
+                sim.current_lat = sim.route_stops[1]["lat"]
+                sim.current_lon = sim.route_stops[1]["lon"]
+                sim.current_speed_kmh = 95.0
+            SIMULATOR_SOURCE[t_no] = "SCHEDULE_REALTIME"
+            SIMULATOR_DESC[t_no] = "Synchronized to timetable operational schedule"
+
         ACTIVE_SIMULATORS[t_no] = sim
         SIMULATOR_LAST_TICK[t_no] = now
         return sim
@@ -67,7 +84,8 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
     elapsed_sec = max(1.0, min(120.0, (now - last_tick).total_seconds()))
     
     # Tick simulation forward based on real elapsed time
-    weather = weather_client.get_weather(sim.route_stops[sim.current_stop_idx]["station_code"], sim.current_lat, sim.current_lon)
+    curr_stn = sim.route_stops[min(sim.current_stop_idx, len(sim.route_stops) - 1)]["station_code"]
+    weather = weather_client.get_weather(curr_stn, sim.current_lat, sim.current_lon)
     sim.tick(elapsed_sec, weather.get("visibility_m", 10000.0), weather.get("precipitation_mm", 0.0))
     SIMULATOR_LAST_TICK[t_no] = now
     return sim
@@ -202,7 +220,9 @@ def get_train_eta_endpoint(train_no: str):
             )
         ),
         delay_reasons=[DelayReason(**r) for r in reasons_list],
-        route_progress=route_progress
+        route_progress=route_progress,
+        telemetry_source=SIMULATOR_SOURCE.get(sim.train_no, "NTES_REALTIME"),
+        live_position_desc=SIMULATOR_DESC.get(sim.train_no)
     )
 
 @router.get("/station/{station_code}/board", response_model=List[StationBoardItem])

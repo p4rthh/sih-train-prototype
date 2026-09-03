@@ -89,6 +89,71 @@ class TrainSimulator:
                 {"seq": 5, "station_code": "BCT", "station_name": "MUMBAI CENTRAL", "lat": 18.9707, "lon": 72.8194, "section_km": 654.0, "cum_dist_km": 1386.0, "halt_min": 0},
             ]
 
+    def anchor_to_ntes(self, last_station_code: str, delay_min: float, speed_kmh: float = 85.0) -> bool:
+        """
+        Anchors the simulator directly to real-time NTES ground truth.
+        """
+        target_code = str(last_station_code).strip().upper()
+        found_idx = None
+
+        for idx, stop in enumerate(self.route_stops):
+            if stop["station_code"].upper() == target_code:
+                found_idx = idx
+                break
+
+        if found_idx is not None:
+            self.current_stop_idx = min(found_idx, len(self.route_stops) - 2)
+            self.current_lat = self.route_stops[found_idx]["lat"]
+            self.current_lon = self.route_stops[found_idx]["lon"]
+            self.current_delay_min = float(delay_min)
+            self.delay_history = [max(0.0, delay_min - 3.0), float(delay_min)]
+            self.current_speed_kmh = speed_kmh
+            self.section_dist_covered_km = 0.0
+            self.status = "RUNNING"
+            print(f"[Sim Anchor] Anchored Train #{self.train_no} to {target_code} with real delay {delay_min}m")
+            return True
+
+        return False
+
+    def sync_to_current_time(self) -> bool:
+        """
+        Synchronizes simulator to real-world time of day along the timetable.
+        """
+        now_ist = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
+        current_minute = now_ist.hour * 60 + now_ist.minute
+
+        for idx, stop in enumerate(self.route_stops[:-1]):
+            dep_str = stop.get("departure") or stop.get("arrival")
+            nxt_str = self.route_stops[idx+1].get("arrival") or self.route_stops[idx+1].get("departure")
+            if not dep_str or not nxt_str:
+                continue
+            try:
+                dh, dm = map(int, str(dep_str).split(":")[:2])
+                ah, am = map(int, str(nxt_str).split(":")[:2])
+                dep_m = dh * 60 + dm
+                arr_m = ah * 60 + am
+                if arr_m < dep_m:
+                    arr_m += 1440
+                
+                check_m = current_minute
+                if check_m < dep_m and current_minute + 1440 <= arr_m:
+                    check_m += 1440
+
+                if dep_m <= check_m <= arr_m:
+                    frac = (check_m - dep_m) / max(1.0, float(arr_m - dep_m))
+                    self.current_stop_idx = idx
+                    self.current_lat = round(stop["lat"] + (self.route_stops[idx+1]["lat"] - stop["lat"]) * frac, 6)
+                    self.current_lon = round(stop["lon"] + (self.route_stops[idx+1]["lon"] - stop["lon"]) * frac, 6)
+                    self.current_speed_kmh = self.max_speed_kmh * 0.85
+                    self.section_dist_covered_km = self.route_stops[idx+1]["section_km"] * frac
+                    self.status = "RUNNING"
+                    print(f"[Sim Sync] Time-of-day synced Train #{self.train_no} to section {stop['station_code']}->{self.route_stops[idx+1]['station_code']}")
+                    return True
+            except Exception:
+                continue
+
+        return False
+
     def get_effective_max_speed(self, visibility_m: float = 10000.0, precipitation_mm: float = 0.0) -> float:
         """Determines physical speed ceiling considering weather safety caps."""
         v_cap = self.max_speed_kmh

@@ -67,15 +67,27 @@ export const TrainStatusBanner: React.FC<Props> = ({ data, isConnected }) => {
         </View>
       </View>
 
+      {/* Real-time NTES Position Callout */}
+      {data.live_position_desc && (
+        <View style={styles.livePosBanner}>
+          <Text style={styles.livePosIcon}>📡</Text>
+          <Text style={styles.livePosText} numberOfLines={2}>
+            {data.live_position_desc}
+          </Text>
+        </View>
+      )}
+
       {/* Streaming Health Dot */}
       <View style={styles.footerRow}>
         <View style={styles.streamIndicator}>
           <View style={[styles.dot, isConnected ? styles.dotLive : styles.dotOffline]} />
           <Text style={styles.streamText}>
-            {isConnected ? "Live Satellite Telemetry (RTIS)" : "Connecting..."}
+            {data.telemetry_source === "NTES_REALTIME"
+              ? "Live NTES Telemetry + Kinematic AI"
+              : "Real-Time Operational Schedule + Kinematic AI"}
           </Text>
         </View>
-        <Text style={styles.schedText}>Sched Arr: {data.scheduled_arrival}</Text>
+        <Text style={styles.schedText}>Sched: {data.scheduled_arrival}</Text>
       </View>
     </View>
   );
@@ -207,5 +219,26 @@ const styles = StyleSheet.create({
     color: "#64748b",
     fontSize: 11,
     fontWeight: "500",
+  },
+  livePosBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(37, 99, 235, 0.15)",
+    borderWidth: 1,
+    borderColor: "#3b82f6",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 10,
+  },
+  livePosIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  livePosText: {
+    fontSize: 11,
+    color: "#93c5fd",
+    fontWeight: "600",
+    flex: 1,
   },
 });
