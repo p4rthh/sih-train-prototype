@@ -29,6 +29,21 @@ def on_startup():
     init_ml_engine()
     print("=" * 60)
 
+@app.get("/")
+def root():
+    return {
+        "status": "online",
+        "service": "RailPravah AI Dynamic ETA Platform",
+        "endpoints": {
+            "health": "/api/health",
+            "search": "/api/trains/search?q={query}",
+            "eta": "/api/train/{train_no}/eta",
+            "station_board": "/api/station/{station_code}/board",
+            "stream": "/api/train/{train_no}/stream",
+            "docs": "/docs"
+        }
+    }
+
 @app.get("/api/health")
 def health_check():
     return {
