@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
-import { searchTrainsBetweenStations } from "../services/api";
+import { searchTrainsBetweenStations, searchStations } from "../services/api";
+import { StationSearchResult } from "../types";
 
 interface RouteItem {
   train_number: string;
@@ -21,90 +22,181 @@ interface Props {
 
 export const RouteSearchScreen: React.FC<Props> = ({ onSelectTrain }) => {
   const [fromStation, setFromStation] = useState<string>("NDLS");
-  const [toStation, setToStation] = useState<string>("BCT");
+  const [toStation, setToStation] = useState<string>("CNB");
+  const [expressOnly, setExpressOnly] = useState<boolean>(true);
   const [trains, setTrains] = useState<RouteItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [searched, setSearched] = useState<boolean>(false);
 
-  const fetchRoutes = async (fromCode: string, toCode: string) => {
-    if (!fromCode || !toCode) return;
+  // Suggestions state
+  const [fromSuggestions, setFromSuggestions] = useState<StationSearchResult[]>([]);
+  const [toSuggestions, setToSuggestions] = useState<StationSearchResult[]>([]);
+  const [activeField, setActiveField] = useState<"from" | "to" | null>(null);
+
+  const fetchRoutes = async (fromVal: string, toVal: string, exp: boolean = expressOnly) => {
+    if (!fromVal || !toVal) return;
     setLoading(true);
     setSearched(true);
-    const results = await searchTrainsBetweenStations(fromCode, toCode);
+    setActiveField(null);
+    const results = await searchTrainsBetweenStations(fromVal, toVal, exp);
     setTrains(results);
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchRoutes(fromStation, toStation);
+    fetchRoutes(fromStation, toStation, expressOnly);
   }, []);
+
+  const handleFromChange = async (txt: string) => {
+    setFromStation(txt);
+    if (txt.trim().length >= 2) {
+      const sugs = await searchStations(txt);
+      setFromSuggestions(sugs.slice(0, 5));
+      setActiveField("from");
+    } else {
+      setFromSuggestions([]);
+      setActiveField(null);
+    }
+  };
+
+  const handleToChange = async (txt: string) => {
+    setToStation(txt);
+    if (txt.trim().length >= 2) {
+      const sugs = await searchStations(txt);
+      setToSuggestions(sugs.slice(0, 5));
+      setActiveField("to");
+    } else {
+      setToSuggestions([]);
+      setActiveField(null);
+    }
+  };
+
+  const selectSuggestion = (field: "from" | "to", item: StationSearchResult) => {
+    if (field === "from") {
+      setFromStation(item.station_code);
+      setFromSuggestions([]);
+    } else {
+      setToStation(item.station_code);
+      setToSuggestions([]);
+    }
+    setActiveField(null);
+  };
 
   const handleSwap = () => {
     const temp = fromStation;
     setFromStation(toStation);
     setToStation(temp);
-    fetchRoutes(toStation, fromStation);
+    fetchRoutes(toStation, fromStation, expressOnly);
   };
 
   const handleQuickRoute = (from: string, to: string) => {
     setFromStation(from);
     setToStation(to);
-    fetchRoutes(from, to);
+    fetchRoutes(from, to, expressOnly);
   };
 
   return (
     <View style={styles.container}>
       {/* Route Input Card */}
       <View style={styles.searchCard}>
-        <Text style={styles.cardHeader}>FIND UPCOMING TRAINS BETWEEN STATIONS</Text>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.cardHeader}>PAN-INDIA TRAIN ROUTE SEARCH</Text>
+          <TouchableOpacity
+            style={[styles.expressToggle, expressOnly && styles.expressToggleActive]}
+            onPress={() => {
+              const nextExp = !expressOnly;
+              setExpressOnly(nextExp);
+              fetchRoutes(fromStation, toStation, nextExp);
+            }}
+          >
+            <Text style={[styles.expressToggleText, expressOnly && styles.expressToggleTextActive]}>
+              {expressOnly ? "⚡ Express Trains Only" : "All Trains (Inc. Local)"}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.inputContainer}>
+          {/* FROM Input */}
           <View style={styles.inputCol}>
-            <Text style={styles.inputLabel}>FROM STATION</Text>
+            <Text style={styles.inputLabel}>ORIGIN STATION / CITY</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. NDLS (New Delhi)"
+              placeholder="e.g. NDLS or New Delhi"
               placeholderTextColor="#94a3b8"
               value={fromStation}
-              onChangeText={setFromStation}
-              autoCapitalize="characters"
+              onChangeText={handleFromChange}
+              onFocus={() => setActiveField("from")}
             />
+            {activeField === "from" && fromSuggestions.length > 0 && (
+              <View style={styles.suggestionsBox}>
+                {fromSuggestions.map((s) => (
+                  <TouchableOpacity
+                    key={s.station_code}
+                    style={styles.sugItem}
+                    onPress={() => selectSuggestion("from", s)}
+                  >
+                    <Text style={styles.sugCode}>{s.station_code}</Text>
+                    <Text style={styles.sugName} numberOfLines={1}>{s.station_name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
 
           <TouchableOpacity style={styles.swapBtn} onPress={handleSwap}>
             <Text style={styles.swapIcon}>⇅</Text>
           </TouchableOpacity>
 
+          {/* TO Input */}
           <View style={styles.inputCol}>
-            <Text style={styles.inputLabel}>TO STATION</Text>
+            <Text style={styles.inputLabel}>DESTINATION STATION / CITY</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. BCT (Mumbai)"
+              placeholder="e.g. BCT or Mumbai"
               placeholderTextColor="#94a3b8"
               value={toStation}
-              onChangeText={setToStation}
-              autoCapitalize="characters"
+              onChangeText={handleToChange}
+              onFocus={() => setActiveField("to")}
             />
+            {activeField === "to" && toSuggestions.length > 0 && (
+              <View style={styles.suggestionsBox}>
+                {toSuggestions.map((s) => (
+                  <TouchableOpacity
+                    key={s.station_code}
+                    style={styles.sugItem}
+                    onPress={() => selectSuggestion("to", s)}
+                  >
+                    <Text style={styles.sugCode}>{s.station_code}</Text>
+                    <Text style={styles.sugName} numberOfLines={1}>{s.station_name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
         </View>
 
         <TouchableOpacity
           style={styles.searchButton}
-          onPress={() => fetchRoutes(fromStation, toStation)}
+          onPress={() => fetchRoutes(fromStation, toStation, expressOnly)}
         >
-          <Text style={styles.searchButtonText}>Search Available Trains ➔</Text>
+          <Text style={styles.searchButtonText}>
+            Search Available Express Trains ➔
+          </Text>
         </TouchableOpacity>
 
-        {/* Quick Route Pills */}
+        {/* Quick Corridor Pills */}
         <View style={styles.quickPillsRow}>
-          <TouchableOpacity style={styles.quickPill} onPress={() => handleQuickRoute("NDLS", "BCT")}>
-            <Text style={styles.quickPillText}>NDLS ➔ BCT</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.quickPill} onPress={() => handleQuickRoute("NDLS", "CNB")}>
-            <Text style={styles.quickPillText}>NDLS ➔ CNB</Text>
+            <Text style={styles.quickPillText}>Delhi ➔ Kanpur</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickPill} onPress={() => handleQuickRoute("NDLS", "BCT")}>
+            <Text style={styles.quickPillText}>Delhi ➔ Mumbai</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickPill} onPress={() => handleQuickRoute("NDLS", "HWH")}>
-            <Text style={styles.quickPillText}>NDLS ➔ HWH</Text>
+            <Text style={styles.quickPillText}>Delhi ➔ Howrah</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickPill} onPress={() => handleQuickRoute("CSMT", "PUNE")}>
+            <Text style={styles.quickPillText}>Mumbai ➔ Pune</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -113,10 +205,10 @@ export const RouteSearchScreen: React.FC<Props> = ({ onSelectTrain }) => {
       {searched && (
         <View style={styles.resultsHeader}>
           <Text style={styles.resultsTitle}>
-            {loading ? "Searching timetables..." : `${trains.length} Trains Found (Sorted by Departure)`}
+            {loading ? "Searching Pan-India schedules..." : `${trains.length} Express Trains Available (Ascending Departure)`}
           </Text>
           <Text style={styles.resultsSub}>
-            {fromStation.toUpperCase()} ➔ {toStation.toUpperCase()}
+            {fromStation.toUpperCase()} ➔ {toStation.toUpperCase()} • {expressOnly ? "Filtered: Express/Superfast/Mail" : "All Services"}
           </Text>
         </View>
       )}
@@ -133,7 +225,7 @@ export const RouteSearchScreen: React.FC<Props> = ({ onSelectTrain }) => {
       {!loading && (
         <FlatList
           data={trains}
-          keyExtractor={(item) => item.train_number}
+          keyExtractor={(item, idx) => `${item.train_number}-${idx}`}
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -180,10 +272,10 @@ export const RouteSearchScreen: React.FC<Props> = ({ onSelectTrain }) => {
             searched && !loading ? (
               <View style={styles.centerBox}>
                 <Text style={styles.emptyText}>
-                  No direct trains found between {fromStation} and {toStation}.
+                  No express trains found between {fromStation} and {toStation}.
                 </Text>
                 <Text style={styles.emptySub}>
-                  Try major hub codes (e.g. NDLS, CNB, BCT, HWH, KOTA).
+                  Try major hub codes or city names (e.g. New Delhi, Mumbai, Kanpur, Howrah, Kota).
                 </Text>
               </View>
             ) : null
@@ -212,22 +304,49 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 2,
+    zIndex: 100,
+  },
+  cardHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
   },
   cardHeader: {
     fontSize: 10,
     fontWeight: "800",
     color: "#2563eb",
     letterSpacing: 0.8,
-    marginBottom: 12,
+  },
+  expressToggle: {
+    backgroundColor: "#f1f5f9",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  expressToggleActive: {
+    backgroundColor: "#eff6ff",
+    borderColor: "#bfdbfe",
+  },
+  expressToggleText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#64748b",
+  },
+  expressToggleTextActive: {
+    color: "#1d4ed8",
   },
   inputContainer: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
     marginBottom: 12,
   },
   inputCol: {
     flex: 1,
+    position: "relative",
   },
   inputLabel: {
     fontSize: 9,
@@ -240,11 +359,48 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 9,
-    fontSize: 14,
+    fontSize: 13,
     color: "#0f172a",
     borderWidth: 1.5,
     borderColor: "#cbd5e1",
     fontWeight: "700",
+  },
+  suggestionsBox: {
+    position: "absolute",
+    top: 60,
+    left: 0,
+    right: 0,
+    backgroundColor: "#ffffff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 999,
+  },
+  sugItem: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sugCode: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#2563eb",
+    width: 45,
+  },
+  sugName: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#0f172a",
+    flex: 1,
   },
   swapBtn: {
     width: 36,
@@ -255,7 +411,7 @@ const styles = StyleSheet.create({
     borderColor: "#bfdbfe",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 14,
+    marginTop: 18,
   },
   swapIcon: {
     fontSize: 16,
@@ -278,6 +434,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 6,
     marginTop: 10,
+    flexWrap: "wrap",
   },
   quickPill: {
     backgroundColor: "#f1f5f9",

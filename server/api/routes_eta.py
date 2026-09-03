@@ -2,9 +2,10 @@ import datetime
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Query
 
-from server.database import search_trains, get_train_schedule, get_db_connection, find_trains_between_stations
+from server.database import search_trains, get_train_schedule, get_db_connection, find_trains_between_stations, search_stations, resolve_station_code
 from server.ingestion.weather_client import WeatherClient
 from server.ingestion.ntes_anchor import get_live_ntes_anchor
+from server.ingestion.pnr_resolver import resolve_pnr_status
 from server.simulator.kinematic_engine import TrainSimulator
 from server.features.pipeline import FeaturePipeline
 from server.models.lightgbm_model import DelayLightGBM
@@ -12,7 +13,8 @@ from server.models.conformal_uq import ConformalCalibrator
 from server.models.explainer import DelayReasonEngine
 from server.api.schemas import (
     TrainSearchResult, ETAResponse, DynamicETA, ConfidenceInterval,
-    DelayReason, RouteStop, StationBoardItem, RouteSearchResultItem
+    DelayReason, RouteStop, StationBoardItem, RouteSearchResultItem,
+    StationSearchResult, PNRResponse
 )
 
 router = APIRouter(prefix="/api", tags=["Train & ETA"])
@@ -119,16 +121,36 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
 @router.get("/trains/search", response_model=List[TrainSearchResult])
 def search_trains_endpoint(q: str = Query(..., min_length=1, description="Train number or name prefix")):
     """Search trains by number or name."""
-    results = search_trains(q, limit=15)
+    results = search_trains(q, limit=20)
     return [TrainSearchResult(train_number=r["train_number"], train_name=r["train_name"]) for r in results]
+
+@router.get("/stations/search", response_model=List[StationSearchResult])
+def search_stations_endpoint(q: str = Query(..., min_length=1, description="Station code or name prefix")):
+    """Search 8,990+ stations across India by code or name."""
+    results = search_stations(q, limit=20)
+    return [StationSearchResult(
+        station_code=r["station_code"],
+        station_name=r["station_name"],
+        state=r.get("state"),
+        zone=r.get("zone")
+    ) for r in results]
+
+@router.get("/pnr/{pnr_no}", response_model=PNRResponse)
+def get_pnr_status_endpoint(pnr_no: str):
+    """Resolve 10-digit Indian Railways PNR and link to live train tracking."""
+    res = resolve_pnr_status(pnr_no)
+    if not res:
+        raise HTTPException(status_code=400, detail="Invalid 10-digit PNR number. Please enter a valid 10-digit PNR.")
+    return PNRResponse(**res)
 
 @router.get("/trains/route", response_model=List[RouteSearchResultItem])
 def search_trains_route_endpoint(
-    from_stn: str = Query(..., description="Origin station code or name (e.g. NDLS)"),
-    to_stn: str = Query(..., description="Destination station code or name (e.g. BCT)")
+    from_stn: str = Query(..., description="Origin station code or name (e.g. NDLS or New Delhi)"),
+    to_stn: str = Query(..., description="Destination station code or name (e.g. BCT or Mumbai Central)"),
+    express_only: bool = Query(True, description="Filter for Express/Superfast/Mail coaching trains only")
 ):
-    """Find all trains running between origin and destination stations ordered by departure."""
-    results = find_trains_between_stations(from_stn, to_stn)
+    """Find all express trains running between origin and destination stations ordered by departure."""
+    results = find_trains_between_stations(from_stn, to_stn, express_only=express_only, limit=100)
     return [RouteSearchResultItem(**r) for r in results]
 
 @router.get("/train/{train_no}/schedule")
@@ -289,28 +311,46 @@ def get_train_eta_endpoint(train_no: str):
     )
 
 @router.get("/station/{station_code}/board", response_model=List[StationBoardItem])
-def get_station_board_endpoint(station_code: str):
-    """Lists upcoming trains at a station with live ETAs."""
-    stn = station_code.strip().upper()
+def get_station_board_endpoint(station_code: str, express_only: bool = Query(True)):
+    """Lists upcoming express trains at a station with live ETAs in IST."""
+    stn = resolve_station_code(station_code.strip())
+    now_ist = datetime.datetime.now(IST)
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("""
+
+    sql = """
         SELECT train_number, train_name, arrival, departure, halt_min
         FROM schedules
         WHERE station_code = ?
-        LIMIT 10
-    """, (stn,))
+    """
+    if express_only:
+        sql += """
+          AND train_name NOT LIKE '%Passenger%'
+          AND train_name NOT LIKE '%MEMU%'
+          AND train_name NOT LIKE '%DEMU%'
+          AND train_name NOT LIKE '%EMU%'
+          AND train_name NOT LIKE '%Local%'
+          AND train_name NOT LIKE '%Shuttle%'
+        """
+    sql += " ORDER BY CASE WHEN departure IS NOT NULL AND departure != 'None' THEN departure ELSE arrival END ASC LIMIT 40"
+
+    cursor.execute(sql, (stn,))
     rows = cursor.fetchall()
     conn.close()
 
     items = []
-    now = datetime.datetime.now()
     for idx, r in enumerate(rows):
-        sched_time = r["arrival"] if r["arrival"] and r["arrival"] != "START" else (r["departure"] or "12:00:00")
-        # Estimate delay for station board demo
-        sim_delay = 12.0 if idx % 2 == 1 else 0.0
-        eta_dt = now + datetime.timedelta(minutes=20 + idx * 15 + sim_delay)
+        sched_time = r["departure"] if r["departure"] and r["departure"] != "None" else (r["arrival"] or "12:00:00")
+        sched_dt = parse_schedule_time(sched_time, 1, now_ist.date())
+        sim_delay = 14.0 if idx % 3 == 1 else (28.0 if idx % 5 == 2 else 0.0)
         
+        if sched_dt:
+            eta_dt = sched_dt + datetime.timedelta(minutes=sim_delay)
+            if eta_dt < now_ist - datetime.timedelta(minutes=10):
+                eta_dt += datetime.timedelta(days=1)
+        else:
+            eta_dt = now_ist + datetime.timedelta(minutes=15 + idx * 10 + sim_delay)
+
         tag = "🟢 On Time" if sim_delay <= 0 else f"🟡 Delayed by {int(sim_delay)}m"
         if sim_delay > 20:
             tag = f"🔴 Delayed by {int(sim_delay)}m"

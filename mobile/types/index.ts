@@ -61,3 +61,33 @@ export interface StationBoardItem {
   status: "ON_TIME" | "DELAYED";
   delay_tag: string;
 }
+
+export interface StationSearchResult {
+  station_code: string;
+  station_name: string;
+  state?: string;
+  zone?: string;
+}
+
+export interface PNRPassenger {
+  number: number;
+  booking_status: string;
+  current_status: string;
+  coach: string;
+  berth: string;
+}
+
+export interface PNRResponse {
+  pnr: string;
+  train_number: string;
+  train_name: string;
+  date_of_journey: string;
+  from_station_code: string;
+  from_station_name: string;
+  to_station_code: string;
+  to_station_name: string;
+  boarding_time: string;
+  passengers: PNRPassenger[];
+  chart_prepared: boolean;
+  source: string;
+}

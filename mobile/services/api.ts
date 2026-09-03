@@ -120,17 +120,44 @@ export async function getStationBoard(stationCode: string): Promise<StationBoard
 
 export async function searchTrainsBetweenStations(
   fromStn: string,
-  toStn: string
+  toStn: string,
+  expressOnly: boolean = true
 ): Promise<any[]> {
   if (!fromStn || !toStn) return [];
   try {
-    const url = `${getApiBaseUrl()}/api/trains/route?from_stn=${encodeURIComponent(fromStn.trim())}&to_stn=${encodeURIComponent(toStn.trim())}`;
+    const url = `${getApiBaseUrl()}/api/trains/route?from_stn=${encodeURIComponent(fromStn.trim())}&to_stn=${encodeURIComponent(toStn.trim())}&express_only=${expressOnly}`;
     const res = await fetch(url, { headers: DEFAULT_HEADERS });
     if (!res.ok) throw new Error(`Route search failed: ${res.status}`);
     return await res.json();
   } catch (err) {
     console.warn(`[API] searchTrainsBetweenStations failed at ${getApiBaseUrl()}:`, err);
     return [];
+  }
+}
+
+export async function searchStations(query: string): Promise<any[]> {
+  if (!query || query.trim().length < 1) return [];
+  try {
+    const url = `${getApiBaseUrl()}/api/stations/search?q=${encodeURIComponent(query.trim())}`;
+    const res = await fetch(url, { headers: DEFAULT_HEADERS });
+    if (!res.ok) throw new Error(`Station search failed: ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn(`[API] searchStations failed at ${getApiBaseUrl()}:`, err);
+    return [];
+  }
+}
+
+export async function getPnrStatus(pnrNo: string): Promise<any | null> {
+  if (!pnrNo || pnrNo.trim().length < 10) return null;
+  try {
+    const url = `${getApiBaseUrl()}/api/pnr/${encodeURIComponent(pnrNo.trim())}`;
+    const res = await fetch(url, { headers: DEFAULT_HEADERS });
+    if (!res.ok) throw new Error(`PNR lookup failed: ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn(`[API] getPnrStatus failed for ${pnrNo} at ${getApiBaseUrl()}:`, err);
+    return null;
   }
 }
 

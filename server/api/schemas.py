@@ -69,3 +69,30 @@ class RouteSearchResultItem(BaseModel):
     to_arrival: str
     duration: str
     stop_count: int
+
+class StationSearchResult(BaseModel):
+    station_code: str
+    station_name: str
+    state: Optional[str] = None
+    zone: Optional[str] = None
+
+class PNRPassenger(BaseModel):
+    number: int
+    booking_status: str
+    current_status: str
+    coach: str
+    berth: str
+
+class PNRResponse(BaseModel):
+    pnr: str
+    train_number: str
+    train_name: str
+    date_of_journey: str
+    from_station_code: str
+    from_station_name: str
+    to_station_code: str
+    to_station_name: str
+    boarding_time: str
+    passengers: List[PNRPassenger]
+    chart_prepared: bool
+    source: str

@@ -109,16 +109,72 @@ def get_station_info(station_code: str) -> Optional[Dict[str, Any]]:
     conn.close()
     return dict(row) if row else None
 
-def find_trains_between_stations(from_stn: str, to_stn: str, limit: int = 30) -> List[Dict[str, Any]]:
-    """Finds all trains running from origin to destination station ordered by departure time."""
+def search_stations(query: str, limit: int = 20) -> List[Dict[str, Any]]:
+    """Search stations across India by code or name."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    from_clean = from_stn.strip().upper()
-    to_clean = to_stn.strip().upper()
+    q_clean = query.strip().upper()
+    q_like = f"%{query.strip()}%"
+    cursor.execute("""
+        SELECT station_code, station_name, state, zone, lat, lon
+        FROM stations
+        WHERE station_code LIKE ? OR station_name LIKE ?
+        ORDER BY 
+            CASE 
+                WHEN station_code = ? THEN 1
+                WHEN station_code LIKE ? THEN 2
+                WHEN station_name LIKE ? THEN 3
+                ELSE 4
+            END,
+            CASE WHEN station_name LIKE '%JN%' OR station_name LIKE '%CENTRAL%' OR station_name LIKE '%TERMINUS%' THEN 1 ELSE 2 END,
+            station_name ASC
+        LIMIT ?
+    """, (f"{q_clean}%", q_like, q_clean, f"{q_clean}%", f"{query.strip()}%", limit))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def resolve_station_code(query: str) -> str:
+    """Resolves station code from code or station name (e.g. 'New Delhi' -> 'NDLS')."""
+    if not query:
+        return ""
+    conn = get_db_connection()
+    c = conn.cursor()
+    q = query.strip().upper()
+    # 1. Exact match code
+    c.execute("SELECT station_code FROM stations WHERE station_code = ?", (q,))
+    row = c.fetchone()
+    if row:
+        conn.close()
+        return row["station_code"]
+    # 2. Exact match name
+    c.execute("SELECT station_code FROM stations WHERE UPPER(station_name) = ?", (q,))
+    row = c.fetchone()
+    if row:
+        conn.close()
+        return row["station_code"]
+    # 3. Fuzzy search major junction / central
+    c.execute("""
+        SELECT station_code FROM stations 
+        WHERE station_name LIKE ? 
+        ORDER BY 
+            CASE WHEN station_name LIKE '%CENTRAL%' OR station_name LIKE '%JN%' OR station_name LIKE '%TERMINUS%' THEN 1 ELSE 2 END 
+        LIMIT 1
+    """, (f"%{q}%",))
+    row = c.fetchone()
+    conn.close()
+    return row["station_code"] if row else q
+
+def find_trains_between_stations(from_stn: str, to_stn: str, express_only: bool = True, limit: int = 100) -> List[Dict[str, Any]]:
+    """Finds all express trains running from origin to destination station ordered by departure time."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    from_code = resolve_station_code(from_stn)
+    to_code = resolve_station_code(to_stn)
     from_like = f"%{from_stn.strip()}%"
     to_like = f"%{to_stn.strip()}%"
 
-    cursor.execute("""
+    sql = """
         SELECT 
             s1.train_number,
             s1.train_name,
@@ -136,9 +192,25 @@ def find_trains_between_stations(from_stn: str, to_stn: str, limit: int = 30) ->
         WHERE (s1.station_code = ? OR s1.station_name LIKE ?)
           AND (s2.station_code = ? OR s2.station_name LIKE ?)
           AND s1.seq < s2.seq
+    """
+    
+    # Filter for Pan-India Express trains only
+    if express_only:
+        sql += """
+          AND s1.train_name NOT LIKE '%Passenger%'
+          AND s1.train_name NOT LIKE '%MEMU%'
+          AND s1.train_name NOT LIKE '%DEMU%'
+          AND s1.train_name NOT LIKE '%EMU%'
+          AND s1.train_name NOT LIKE '%Local%'
+          AND s1.train_name NOT LIKE '%Shuttle%'
+        """
+
+    sql += """
         ORDER BY s1.departure ASC
         LIMIT ?
-    """, (from_clean, from_like, to_clean, to_like, limit))
+    """
+
+    cursor.execute(sql, (from_code, from_like, to_code, to_like, limit))
     rows = cursor.fetchall()
     conn.close()
 

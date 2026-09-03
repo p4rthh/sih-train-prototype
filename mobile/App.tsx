@@ -5,10 +5,11 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { TrainDetailScreen } from "./screens/TrainDetailScreen";
 import { StationBoardScreen } from "./screens/StationBoardScreen";
 import { RouteSearchScreen } from "./screens/RouteSearchScreen";
+import { PNRSearchScreen } from "./screens/PNRSearchScreen";
 import { getActiveHost, setCustomHost, getApiBaseUrl } from "./services/api";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"tracker" | "route" | "station">("tracker");
+  const [activeTab, setActiveTab] = useState<"tracker" | "route" | "pnr" | "station">("tracker");
   const [activeTrainNo, setActiveTrainNo] = useState<string>("12952");
   const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
   const [tempHost, setTempHost] = useState<string>(getActiveHost());
@@ -74,6 +75,15 @@ export default function App() {
             </TouchableOpacity>
 
             <TouchableOpacity
+              style={[styles.tabBtn, activeTab === "pnr" && styles.tabBtnActive]}
+              onPress={() => setActiveTab("pnr")}
+            >
+              <Text style={[styles.tabText, activeTab === "pnr" && styles.tabTextActive]}>
+                PNR Status
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.tabBtn, activeTab === "station" && styles.tabBtnActive]}
               onPress={() => setActiveTab("station")}
             >
@@ -91,6 +101,9 @@ export default function App() {
           )}
           {activeTab === "route" && (
             <RouteSearchScreen onSelectTrain={handleSelectTrain} />
+          )}
+          {activeTab === "pnr" && (
+            <PNRSearchScreen onSelectTrain={handleSelectTrain} />
           )}
           {activeTab === "station" && (
             <StationBoardScreen onSelectTrain={handleSelectTrain} />
