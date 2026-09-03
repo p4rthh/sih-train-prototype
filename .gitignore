@@ -1,0 +1,28 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.pkl
+*.parquet
+
+# Data
+data/raw/schedules.json
+data/raw/trains.json
+data/processed/
+*.db
+*.sqlite
+*.sqlite3
+
+# Node / React Native / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+*.log
