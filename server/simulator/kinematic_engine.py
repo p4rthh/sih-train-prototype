@@ -79,7 +79,29 @@ class TrainSimulator:
                 {"seq": 5, "station_code": "BCT", "station_name": "MUMBAI CENTRAL", "lat": 18.9707, "lon": 72.8194, "section_km": 654.0, "cum_dist_km": 1386.0, "halt_min": 0},
             ]
 
-    def anchor_to_ntes(self, last_station_code: str, delay_min: float, speed_kmh: float = 85.0) -> bool:
+    def anchor_to_ntes(self, last_station_code: str, delay_min: float, run_status: str = "RUNNING", speed_kmh: float = 85.0) -> bool:
+        if run_status == "YET_TO_START":
+            self.current_stop_idx = 0
+            self.current_lat = self.route_stops[0]["lat"]
+            self.current_lon = self.route_stops[0]["lon"]
+            self.current_delay_min = 0.0
+            self.delay_history = [0.0]
+            self.current_speed_kmh = 0.0
+            self.section_dist_covered_km = 0.0
+            self.status = "YET_TO_START"
+            return True
+
+        if run_status == "COMPLETED":
+            self.current_stop_idx = len(self.route_stops) - 1
+            self.current_lat = self.route_stops[-1]["lat"]
+            self.current_lon = self.route_stops[-1]["lon"]
+            self.current_delay_min = float(delay_min)
+            self.delay_history = [float(delay_min)]
+            self.current_speed_kmh = 0.0
+            self.section_dist_covered_km = 0.0
+            self.status = "COMPLETED"
+            return True
+
         target_code = str(last_station_code).strip().upper()
         found_idx = None
 
@@ -104,6 +126,22 @@ class TrainSimulator:
     def sync_to_current_time(self) -> bool:
         now_ist = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
         current_minute = now_ist.hour * 60 + now_ist.minute
+
+        orig_dep = self.route_stops[0].get("departure") or self.route_stops[0].get("arrival")
+        if orig_dep:
+            try:
+                oh, om = map(int, str(orig_dep).split(":")[:2])
+                orig_m = oh * 60 + om
+                if current_minute < orig_m:
+                    self.current_stop_idx = 0
+                    self.current_lat = self.route_stops[0]["lat"]
+                    self.current_lon = self.route_stops[0]["lon"]
+                    self.current_speed_kmh = 0.0
+                    self.current_delay_min = 0.0
+                    self.status = "YET_TO_START"
+                    return True
+            except Exception:
+                pass
 
         for idx, stop in enumerate(self.route_stops[:-1]):
             dep_str = stop.get("departure") or stop.get("arrival")
@@ -134,6 +172,22 @@ class TrainSimulator:
             except Exception:
                 continue
 
+        # If after all schedule stops on Day 1
+        dstn_arr = self.route_stops[-1].get("arrival") or self.route_stops[-1].get("departure")
+        if dstn_arr and self.route_stops[-1].get("day", 1) == 1:
+            try:
+                dh, dm = map(int, str(dstn_arr).split(":")[:2])
+                dstn_m = dh * 60 + dm
+                if current_minute > dstn_m:
+                    self.current_stop_idx = len(self.route_stops) - 1
+                    self.current_lat = self.route_stops[-1]["lat"]
+                    self.current_lon = self.route_stops[-1]["lon"]
+                    self.current_speed_kmh = 0.0
+                    self.status = "COMPLETED"
+                    return True
+            except Exception:
+                pass
+
         return False
 
     def get_effective_max_speed(self, visibility_m: float = 10000.0, precipitation_mm: float = 0.0) -> float:
@@ -149,6 +203,10 @@ class TrainSimulator:
         return v_cap
 
     def tick(self, dt_seconds: float = 30.0, visibility_m: float = 10000.0, precipitation_mm: float = 0.0) -> Dict[str, Any]:
+        if self.status in ["YET_TO_START", "COMPLETED"]:
+            self.current_speed_kmh = 0.0
+            return self.get_state()
+
         if self.current_stop_idx >= len(self.route_stops) - 1:
             self.status = "COMPLETED"
             self.current_speed_kmh = 0.0

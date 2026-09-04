@@ -21,15 +21,80 @@ def get_live_ntes_anchor(train_no: str) -> Optional[Dict[str, Any]]:
         res = ntes_client.live_status(t_no, today)
         
         if not res or not isinstance(res, dict):
-            return None
+            # Check yesterday for multi-day long distance runs
+            yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%d-%b-%Y")
+            res_yest = ntes_client.live_status(t_no, yesterday)
+            if res_yest and isinstance(res_yest, dict):
+                res = res_yest
+            else:
+                return None
 
-        last_stn = res.get("LSTN")
-        if not last_stn:
+        cpos = str(res.get("CPOS") or "").strip()
+        cpos_lower = cpos.lower()
+        trunst = res.get("TRUNST")
+        is_arr_dstn = bool(res.get("isArrDSTN", False))
+
+        src_code = str(res.get("SRC") or "").strip().upper()
+        dstn_code = str(res.get("DSTN") or "").strip().upper()
+        last_stn = str(res.get("LSTN") or "").strip().upper()
+
+        # Case 1: Train has NOT started yet in the real world
+        if trunst == 0 or "yet to start" in cpos_lower:
+            anchor_data = {
+                "train_no": t_no,
+                "train_name": res.get("TNM", ""),
+                "run_status": "YET_TO_START",
+                "last_station_code": src_code,
+                "last_station_name": res.get("SRCN", ""),
+                "next_station_code": None,
+                "next_station_name": None,
+                "current_delay_min": 0.0,
+                "position_desc": cpos if cpos else f"Yet to start from source station ({src_code})",
+                "is_arrived_dest": False,
+                "source_code": src_code,
+                "dest_code": dstn_code,
+                "fetch_timestamp": now_ts
+            }
+            NTES_CACHE[t_no] = anchor_data
+            NTES_CACHE_TIMESTAMP[t_no] = now_ts
+            return anchor_data
+
+        # Case 2: Train has completed journey / reached final destination
+        if is_arr_dstn or trunst == 2 or ("arrived at" in cpos_lower and dstn_code and dstn_code in cpos.upper()):
+            delay_val = res.get("LDEL")
+            try:
+                delay_min = float(delay_val) if delay_val is not None else 0.0
+            except (ValueError, TypeError):
+                delay_min = 0.0
+
+            anchor_data = {
+                "train_no": t_no,
+                "train_name": res.get("TNM", ""),
+                "run_status": "COMPLETED",
+                "last_station_code": dstn_code or last_stn,
+                "last_station_name": res.get("LSTNN", ""),
+                "next_station_code": None,
+                "next_station_name": None,
+                "current_delay_min": delay_min,
+                "position_desc": cpos if cpos else f"Journey completed. Arrived at destination ({dstn_code})",
+                "is_arrived_dest": True,
+                "source_code": src_code,
+                "dest_code": dstn_code,
+                "fetch_timestamp": now_ts
+            }
+            NTES_CACHE[t_no] = anchor_data
+            NTES_CACHE_TIMESTAMP[t_no] = now_ts
+            return anchor_data
+
+        # Case 3: Train is actively running on tracks
+        if not last_stn and not is_arr_dstn:
+            # Check yesterday for multi-day runs
             yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%d-%b-%Y")
             res_yest = ntes_client.live_status(t_no, yesterday)
             if res_yest and isinstance(res_yest, dict) and res_yest.get("LSTN"):
                 res = res_yest
-                last_stn = res.get("LSTN")
+                last_stn = str(res.get("LSTN") or "").strip().upper()
+                cpos = str(res.get("CPOS") or "").strip()
 
         if not last_stn:
             return None
@@ -43,15 +108,16 @@ def get_live_ntes_anchor(train_no: str) -> Optional[Dict[str, Any]]:
         anchor_data = {
             "train_no": t_no,
             "train_name": res.get("TNM", ""),
-            "last_station_code": str(last_stn).strip().upper(),
+            "run_status": "RUNNING",
+            "last_station_code": last_stn,
             "last_station_name": res.get("LSTNN", ""),
             "next_station_code": str(res.get("NPSTN") or res.get("NSTN") or "").strip().upper(),
             "next_station_name": res.get("NPSTNN") or res.get("NSTNN") or "",
             "current_delay_min": delay_min,
-            "position_desc": res.get("CPOS") or res.get("LUPDFULL") or "",
-            "is_arrived_dest": res.get("isArrDSTN", False),
-            "source_code": res.get("SRC"),
-            "dest_code": res.get("DSTN"),
+            "position_desc": cpos or res.get("LUPDFULL") or f"Live at {last_stn}",
+            "is_arrived_dest": False,
+            "source_code": src_code,
+            "dest_code": dstn_code,
             "fetch_timestamp": now_ts
         }
 
@@ -59,5 +125,5 @@ def get_live_ntes_anchor(train_no: str) -> Optional[Dict[str, Any]]:
         NTES_CACHE_TIMESTAMP[t_no] = now_ts
         return anchor_data
 
-    except Exception as e:
+    except Exception:
         return None
