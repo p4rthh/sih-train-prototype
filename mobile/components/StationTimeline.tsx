@@ -37,7 +37,7 @@ export const StationTimeline: React.FC<Props> = ({ stops }) => {
               <View style={styles.timeCol}>
                 <Text style={styles.timeMain}>{displayTime}</Text>
                 <Text style={styles.timeSub}>
-                  {isUpcoming ? "Forecast" : isCurrent ? "At Station" : "Departed"}
+                  {isUpcoming ? "Forecast" : isCurrent ? (idx === 0 ? "Source" : "At Station") : "Departed"}
                 </Text>
               </View>
 

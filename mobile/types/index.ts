@@ -37,6 +37,7 @@ export interface RouteStop {
 export interface ETAResponse {
   train_no: string;
   train_name: string;
+  run_status?: "RUNNING" | "YET_TO_START" | "COMPLETED" | "NOT_RUNNING_TODAY" | "CANCELLED";
   current_station_code: string;
   current_station_name: string;
   next_station_code: string;

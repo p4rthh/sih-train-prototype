@@ -186,10 +186,34 @@ def get_train_eta_endpoint(train_no: str):
     pred_delta_stgcn = 0.0
     now_ist = datetime.datetime.now(IST)
 
+    is_not_running = (sim.status == "NOT_RUNNING_TODAY")
+    is_cancelled = (sim.status == "CANCELLED")
     is_yet_to_start = (sim.status == "YET_TO_START")
     is_completed = (sim.status == "COMPLETED")
 
-    if is_yet_to_start:
+    if is_not_running:
+        curr_delay = 0.0
+        forecasted_delay = 0.0
+        window_lower_min = 0.0
+        window_upper_min = 0.0
+        desc_text = SIMULATOR_DESC.get(t_no) or "Train is not scheduled to run today on Indian Railways network"
+        reasons_list = [{
+            "reason": desc_text,
+            "severity": "LOW",
+            "impact_min": 0.0
+        }]
+    elif is_cancelled:
+        curr_delay = 0.0
+        forecasted_delay = 0.0
+        window_lower_min = 0.0
+        window_upper_min = 0.0
+        desc_text = SIMULATOR_DESC.get(t_no) or "Train service cancelled by Indian Railways"
+        reasons_list = [{
+            "reason": desc_text,
+            "severity": "HIGH",
+            "impact_min": 0.0
+        }]
+    elif is_yet_to_start:
         curr_delay = 0.0
         forecasted_delay = 0.0
         window_lower_min = 0.0
@@ -247,10 +271,10 @@ def get_train_eta_endpoint(train_no: str):
             "impact_min": 0.0
         }]
 
-    nxt_idx = 0 if is_yet_to_start else min(state["current_stop_idx"] + 1, len(sim.route_stops) - 1)
+    nxt_idx = 0 if (is_yet_to_start or is_not_running or is_cancelled) else min(state["current_stop_idx"] + 1, len(sim.route_stops) - 1)
     nxt_stop = sim.route_stops[nxt_idx]
 
-    if is_yet_to_start:
+    if is_not_running or is_cancelled or is_yet_to_start:
         raw_sched = sim.route_stops[0].get("departure") or "--:--"
     elif is_completed:
         raw_sched = sim.route_stops[-1].get("arrival") or "--:--"
@@ -258,7 +282,7 @@ def get_train_eta_endpoint(train_no: str):
         raw_sched = nxt_stop.get("arrival") or nxt_stop.get("departure") or "--:--"
     sched_str = str(raw_sched)[:5] if len(str(raw_sched)) >= 5 and str(raw_sched) != "START" else str(raw_sched)
 
-    if is_yet_to_start:
+    if is_not_running or is_cancelled or is_yet_to_start:
         point_eta_dt = parse_schedule_time(sched_str, sim.route_stops[0].get("day", 1), now_ist.date()) or now_ist
         lower_eta_dt = point_eta_dt
         upper_eta_dt = point_eta_dt
@@ -305,7 +329,12 @@ def get_train_eta_endpoint(train_no: str):
         is_rec = False
         rec_amt = 0.0
 
-        if is_yet_to_start:
+        if is_not_running or is_cancelled:
+            status = "current" if idx == 0 else "upcoming"
+            d_min = 0.0
+            raw_t = stop.get("departure") if idx == 0 else (stop.get("arrival") or stop.get("departure") or "--:--")
+            eta_time = "CANCELLED" if is_cancelled else (str(raw_t)[:5] if raw_t and raw_t != "START" else "--:--")
+        elif is_yet_to_start:
             if idx == 0:
                 status = "current"
                 d_min = 0.0
@@ -391,17 +420,18 @@ def get_train_eta_endpoint(train_no: str):
             "impact_min": -round(dest_recovered_min, 1)
         })
 
-    curr_stn_code = sim.route_stops[0]["station_code"] if is_yet_to_start else (sim.route_stops[-1]["station_code"] if is_completed else state["current_station_code"])
-    curr_stn_name = sim.route_stops[0]["station_name"] if is_yet_to_start else (sim.route_stops[-1]["station_name"] if is_completed else state["current_station_name"])
-    nxt_stn_code = (sim.route_stops[1]["station_code"] if len(sim.route_stops) > 1 else sim.route_stops[0]["station_code"]) if is_yet_to_start else (sim.route_stops[-1]["station_code"] if is_completed else state["next_station_code"])
-    nxt_stn_name = (sim.route_stops[1]["station_name"] if len(sim.route_stops) > 1 else sim.route_stops[0]["station_name"]) if is_yet_to_start else (sim.route_stops[-1]["station_name"] if is_completed else state["next_station_name"])
-    curr_lat = sim.route_stops[0]["lat"] if is_yet_to_start else (sim.route_stops[-1]["lat"] if is_completed else state["lat"])
-    curr_lon = sim.route_stops[0]["lon"] if is_yet_to_start else (sim.route_stops[-1]["lon"] if is_completed else state["lon"])
-    curr_speed = 0.0 if (is_yet_to_start or is_completed) else state["speed_kmh"]
+    curr_stn_code = sim.route_stops[0]["station_code"] if (is_yet_to_start or is_not_running or is_cancelled) else (sim.route_stops[-1]["station_code"] if is_completed else state["current_station_code"])
+    curr_stn_name = sim.route_stops[0]["station_name"] if (is_yet_to_start or is_not_running or is_cancelled) else (sim.route_stops[-1]["station_name"] if is_completed else state["current_station_name"])
+    nxt_stn_code = (sim.route_stops[-1]["station_code"] if (is_not_running or is_cancelled) else ((sim.route_stops[1]["station_code"] if len(sim.route_stops) > 1 else sim.route_stops[0]["station_code"]) if is_yet_to_start else (sim.route_stops[-1]["station_code"] if is_completed else state["next_station_code"])))
+    nxt_stn_name = (sim.route_stops[-1]["station_name"] if (is_not_running or is_cancelled) else ((sim.route_stops[1]["station_name"] if len(sim.route_stops) > 1 else sim.route_stops[0]["station_name"]) if is_yet_to_start else (sim.route_stops[-1]["station_name"] if is_completed else state["next_station_name"])))
+    curr_lat = sim.route_stops[0]["lat"] if (is_yet_to_start or is_not_running or is_cancelled) else (sim.route_stops[-1]["lat"] if is_completed else state["lat"])
+    curr_lon = sim.route_stops[0]["lon"] if (is_yet_to_start or is_not_running or is_cancelled) else (sim.route_stops[-1]["lon"] if is_completed else state["lon"])
+    curr_speed = 0.0 if (is_yet_to_start or is_completed or is_not_running or is_cancelled) else state["speed_kmh"]
 
     return ETAResponse(
         train_no=raw_no,
         train_name=sim.train_name,
+        run_status=sim.status,
         current_station_code=curr_stn_code,
         current_station_name=curr_stn_name,
         next_station_code=nxt_stn_code,
@@ -471,9 +501,9 @@ def get_station_board_endpoint(station_code: str, express_only: bool = Query(Tru
         else:
             eta_dt = now_ist + datetime.timedelta(minutes=15 + idx * 10 + sim_delay)
 
-        tag = "🟢 On Time" if sim_delay <= 0 else f"🟡 Delayed by {int(sim_delay)}m"
+        tag = "On Time" if sim_delay <= 0 else f"Delayed by {int(sim_delay)}m"
         if sim_delay > 20:
-            tag = f"🔴 Delayed by {int(sim_delay)}m"
+            tag = f"Delayed by {int(sim_delay)}m"
 
         items.append(StationBoardItem(
             train_number=r["train_number"],

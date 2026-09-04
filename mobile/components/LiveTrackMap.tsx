@@ -231,7 +231,9 @@ export const LiveTrackMap: React.FC<Props> = ({ lat, lon, speedKmh, stops, train
                 </View>
               </View>
               <View style={styles.trainLabelCard}>
-                <Text style={styles.trainLabelText}>Train #{trainNo}</Text>
+                <Text style={styles.trainLabelText}>
+                  Train #{trainNo} {Math.round(speedKmh) === 0 ? "• Stationary" : ""}
+                </Text>
                 <Text style={styles.telemetryMini}>
                   {lat.toFixed(3)}°N, {lon.toFixed(3)}°E
                 </Text>

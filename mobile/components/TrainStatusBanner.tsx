@@ -8,8 +8,42 @@ interface Props {
 }
 
 export const TrainStatusBanner: React.FC<Props> = ({ data, isConnected }) => {
+  const isNotRunning = data.run_status === "NOT_RUNNING_TODAY";
+  const isCancelled = data.run_status === "CANCELLED";
+  const isYetToStart = data.run_status === "YET_TO_START";
+  const isCompleted = data.run_status === "COMPLETED";
   const isDelayed = data.forecasted_delay_min > 5;
   const isSevere = data.forecasted_delay_min > 20;
+
+  let pillStyle = styles.pillOnTime;
+  let textStyle = styles.textOnTime;
+  let statusTitle = "On Time";
+
+  if (isCancelled) {
+    pillStyle = styles.pillSevere;
+    textStyle = styles.textSevere;
+    statusTitle = "Cancelled";
+  } else if (isNotRunning) {
+    pillStyle = styles.pillNotRunning;
+    textStyle = styles.textNotRunning;
+    statusTitle = "Not Running Today";
+  } else if (isYetToStart) {
+    pillStyle = styles.pillYetToStart;
+    textStyle = styles.textYetToStart;
+    statusTitle = "Yet to Start";
+  } else if (isCompleted) {
+    pillStyle = styles.pillCompleted;
+    textStyle = styles.textCompleted;
+    statusTitle = "Arrived";
+  } else if (isSevere) {
+    pillStyle = styles.pillSevere;
+    textStyle = styles.textSevere;
+    statusTitle = `Delayed ${Math.round(data.forecasted_delay_min)}m`;
+  } else if (isDelayed) {
+    pillStyle = styles.pillDelayed;
+    textStyle = styles.textDelayed;
+    statusTitle = `Delayed ${Math.round(data.forecasted_delay_min)}m`;
+  }
 
   return (
     <View style={styles.card}>
@@ -21,27 +55,17 @@ export const TrainStatusBanner: React.FC<Props> = ({ data, isConnected }) => {
             {data.train_name}
           </Text>
         </View>
-        <View
-          style={[
-            styles.statusPill,
-            isSevere ? styles.pillSevere : isDelayed ? styles.pillDelayed : styles.pillOnTime,
-          ]}
-        >
-          <Text
-            style={[
-              styles.statusText,
-              isSevere ? styles.textSevere : isDelayed ? styles.textDelayed : styles.textOnTime,
-            ]}
-          >
-            {isDelayed ? `Delayed ${Math.round(data.forecasted_delay_min)}m` : "On Time"}
-          </Text>
+        <View style={[styles.statusPill, pillStyle]}>
+          <Text style={[styles.statusText, textStyle]}>{statusTitle}</Text>
         </View>
       </View>
 
       {/* Metric Counters */}
       <View style={styles.metricsRow}>
         <View style={styles.metricBox}>
-          <Text style={styles.metricLabel}>CURRENT STOP</Text>
+          <Text style={styles.metricLabel}>
+            {isNotRunning || isCancelled ? "SOURCE" : isYetToStart ? "ORIGIN (PLATFORM)" : isCompleted ? "TERMINAL" : "CURRENT STOP"}
+          </Text>
           <Text style={styles.metricValue} numberOfLines={1}>
             {data.current_station_name}
           </Text>
@@ -51,19 +75,25 @@ export const TrainStatusBanner: React.FC<Props> = ({ data, isConnected }) => {
         <View style={styles.metricDivider} />
 
         <View style={styles.metricBox}>
-          <Text style={styles.metricLabel}>NEXT STOP</Text>
-          <Text style={styles.metricValue} numberOfLines={1}>
-            {data.next_station_name}
+          <Text style={styles.metricLabel}>
+            {isNotRunning || isCancelled ? "DESTINATION" : isYetToStart ? "FIRST STOP" : isCompleted ? "SERVICE" : "NEXT STOP"}
           </Text>
-          <Text style={styles.metricSub}>{data.next_station_code}</Text>
+          <Text style={styles.metricValue} numberOfLines={1}>
+            {isCompleted ? "Completed" : data.next_station_name}
+          </Text>
+          <Text style={styles.metricSub}>{isCompleted ? "FINAL" : data.next_station_code}</Text>
         </View>
 
         <View style={styles.metricDivider} />
 
         <View style={styles.metricBox}>
           <Text style={styles.metricLabel}>LIVE SPEED</Text>
-          <Text style={styles.metricValue}>{Math.round(data.speed_kmh)}</Text>
-          <Text style={styles.metricSub}>km/h</Text>
+          <Text style={styles.metricValue}>
+            {isNotRunning || isCancelled || isYetToStart || isCompleted ? "0" : Math.round(data.speed_kmh)}
+          </Text>
+          <Text style={styles.metricSub}>
+            {isNotRunning ? "Not Running" : isCancelled ? "Cancelled" : isYetToStart ? "Waiting" : isCompleted ? "Arrived" : "km/h"}
+          </Text>
         </View>
       </View>
 
@@ -171,6 +201,15 @@ const styles = StyleSheet.create({
   pillSevere: {
     backgroundColor: "#7f1d1d",
   },
+  pillNotRunning: {
+    backgroundColor: "#334155",
+  },
+  pillYetToStart: {
+    backgroundColor: "#1e3a8a",
+  },
+  pillCompleted: {
+    backgroundColor: "#134e4a",
+  },
   statusText: {
     fontSize: 12,
     fontWeight: "700",
@@ -183,6 +222,15 @@ const styles = StyleSheet.create({
   },
   textSevere: {
     color: "#f87171",
+  },
+  textNotRunning: {
+    color: "#cbd5e1",
+  },
+  textYetToStart: {
+    color: "#93c5fd",
+  },
+  textCompleted: {
+    color: "#5eead4",
   },
   metricsRow: {
     flexDirection: "row",

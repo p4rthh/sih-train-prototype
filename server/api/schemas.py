@@ -35,6 +35,7 @@ class RouteStop(BaseModel):
 class ETAResponse(BaseModel):
     train_no: str
     train_name: str
+    run_status: Optional[str] = "RUNNING"
     current_station_code: str
     current_station_name: str
     next_station_code: str

@@ -80,6 +80,28 @@ class TrainSimulator:
             ]
 
     def anchor_to_ntes(self, last_station_code: str, delay_min: float, run_status: str = "RUNNING", speed_kmh: float = 85.0, next_station_code: Optional[str] = None) -> bool:
+        if run_status == "NOT_RUNNING_TODAY":
+            self.current_stop_idx = 0
+            self.current_lat = self.route_stops[0]["lat"]
+            self.current_lon = self.route_stops[0]["lon"]
+            self.current_delay_min = 0.0
+            self.delay_history = [0.0]
+            self.current_speed_kmh = 0.0
+            self.section_dist_covered_km = 0.0
+            self.status = "NOT_RUNNING_TODAY"
+            return True
+
+        if run_status == "CANCELLED":
+            self.current_stop_idx = 0
+            self.current_lat = self.route_stops[0]["lat"]
+            self.current_lon = self.route_stops[0]["lon"]
+            self.current_delay_min = 0.0
+            self.delay_history = [0.0]
+            self.current_speed_kmh = 0.0
+            self.section_dist_covered_km = 0.0
+            self.status = "CANCELLED"
+            return True
+
         if run_status == "YET_TO_START":
             self.current_stop_idx = 0
             self.current_lat = self.route_stops[0]["lat"]
@@ -218,7 +240,7 @@ class TrainSimulator:
         return v_cap
 
     def tick(self, dt_seconds: float = 30.0, visibility_m: float = 10000.0, precipitation_mm: float = 0.0) -> Dict[str, Any]:
-        if self.status in ["YET_TO_START", "COMPLETED"]:
+        if self.status in ["YET_TO_START", "COMPLETED", "NOT_RUNNING_TODAY", "CANCELLED"]:
             self.current_speed_kmh = 0.0
             return self.get_state()
 
