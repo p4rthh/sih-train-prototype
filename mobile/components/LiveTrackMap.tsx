@@ -216,7 +216,11 @@ export const LiveTrackMap: React.FC<Props> = ({ lat, lon, speedKmh, stops, train
               <Text style={styles.stationCode} numberOfLines={1}>
                 {stops[0]?.station_code || "START"}
               </Text>
-              <Text style={styles.stationTime}>{stops[0]?.scheduled_departure || "16:30"}</Text>
+              <Text style={styles.stationTime}>
+                {stops[0]?.scheduled_departure && stops[0].scheduled_departure !== "START"
+                  ? stops[0].scheduled_departure.slice(0, 5)
+                  : "--:--"}
+              </Text>
             </View>
 
             <View style={styles.activeSectionBox}>
@@ -239,7 +243,11 @@ export const LiveTrackMap: React.FC<Props> = ({ lat, lon, speedKmh, stops, train
               <Text style={styles.stationCode} numberOfLines={1}>
                 {stops[stops.length - 1]?.station_code || "DEST"}
               </Text>
-              <Text style={styles.stationTime}>{stops[stops.length - 1]?.scheduled_arrival || "END"}</Text>
+              <Text style={styles.stationTime}>
+                {stops[stops.length - 1]?.scheduled_arrival && stops[stops.length - 1].scheduled_arrival !== "None"
+                  ? stops[stops.length - 1].scheduled_arrival.slice(0, 5)
+                  : "END"}
+              </Text>
             </View>
           </View>
         </View>

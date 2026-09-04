@@ -23,16 +23,21 @@ export const StationTimeline: React.FC<Props> = ({ stops }) => {
           const isDeparted = stop.status === "departed";
           const isCurrent = stop.status === "current";
           const isUpcoming = stop.status === "upcoming";
+          const schedTime =
+            stop.scheduled_departure && stop.scheduled_departure !== "None" && stop.scheduled_departure !== "START"
+              ? stop.scheduled_departure.slice(0, 5)
+              : stop.scheduled_arrival && stop.scheduled_arrival !== "None" && stop.scheduled_arrival !== "START"
+              ? stop.scheduled_arrival.slice(0, 5)
+              : "--:--";
+          const displayTime = isUpcoming ? (stop.eta || schedTime) : schedTime;
 
           return (
             <View key={idx} style={styles.timelineRow}>
               {/* Left Column: Scheduled & ETA times */}
               <View style={styles.timeCol}>
-                <Text style={styles.timeMain}>
-                  {isUpcoming ? (stop.eta || "--:--") : (stop.scheduled_arrival || stop.scheduled_departure || "--:--")}
-                </Text>
+                <Text style={styles.timeMain}>{displayTime}</Text>
                 <Text style={styles.timeSub}>
-                  {isUpcoming ? "Forecast" : (isCurrent ? "At Station" : "Departed")}
+                  {isUpcoming ? "Forecast" : isCurrent ? "At Station" : "Departed"}
                 </Text>
               </View>
 

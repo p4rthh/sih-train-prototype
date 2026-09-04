@@ -6,7 +6,7 @@ from ntes import NTESClient
 ntes_client = NTESClient()
 
 SAMPLE_EXPRESS_TRAINS = [
-    {"train_number": "12952", "train_name": "Mumbai Rajdhani Express", "from_code": "NDLS", "from_name": "NEW DELHI", "to_code": "BCT", "to_name": "MUMBAI CENTRAL", "dep": "16:30", "coach": "B3", "berth": "42"},
+    {"train_number": "12952", "train_name": "Mumbai Rajdhani Express", "from_code": "NDLS", "from_name": "NEW DELHI", "to_code": "BCT", "to_name": "MUMBAI CENTRAL", "dep": "16:55", "coach": "B3", "berth": "42"},
     {"train_number": "12301", "train_name": "Howrah Rajdhani Express", "from_code": "HWH", "from_name": "HOWRAH JN", "to_code": "NDLS", "to_name": "NEW DELHI", "dep": "16:50", "coach": "A1", "berth": "18"},
     {"train_number": "12004", "train_name": "Lucknow Swarn Shatabdi Express", "from_code": "NDLS", "from_name": "NEW DELHI", "to_code": "LJN", "to_name": "LUCKNOW NE", "dep": "06:10", "coach": "C2", "berth": "54"},
     {"train_number": "22436", "train_name": "Vande Bharat Express", "from_code": "NDLS", "from_name": "NEW DELHI", "to_code": "BSB", "to_name": "VARANASI JN", "dep": "06:00", "coach": "C4", "berth": "23"},
@@ -45,7 +45,7 @@ def resolve_pnr_status(pnr_number: str) -> Optional[Dict[str, Any]]:
                     "from_station_name": cris_res.get("sourceStationName", cris_res.get("sourceStation", "NDLS")),
                     "to_station_code": cris_res.get("reservationUpto", "BCT"),
                     "to_station_name": cris_res.get("reservationUptoName", cris_res.get("reservationUpto", "BCT")),
-                    "boarding_time": cris_res.get("departureTime", "16:30"),
+                    "boarding_time": cris_res.get("departureTime", "16:55"),
                     "passengers": passengers or [{"number": 1, "booking_status": "CNF", "current_status": "CNF", "coach": "B1", "berth": "32"}],
                     "chart_prepared": cris_res.get("chartPrepared", True),
                     "source": "CRIS_LIVE"

@@ -10,11 +10,15 @@ CACHE_TTL_SECONDS = 60.0
 ntes_client = NTESClient()
 
 def get_live_ntes_anchor(train_no: str) -> Optional[Dict[str, Any]]:
-    t_no = str(train_no).strip()
+    raw_no = str(train_no).strip()
+    from server.database import TRAIN_ALIASES
+    t_no = TRAIN_ALIASES.get(raw_no, raw_no)
     now_ts = time.time()
 
     if t_no in NTES_CACHE and (now_ts - NTES_CACHE_TIMESTAMP.get(t_no, 0)) < CACHE_TTL_SECONDS:
-        return NTES_CACHE[t_no]
+        cached = dict(NTES_CACHE[t_no])
+        cached["train_no"] = raw_no
+        return cached
 
     try:
         today = datetime.date.today().strftime("%d-%b-%Y")
@@ -55,8 +59,9 @@ def get_live_ntes_anchor(train_no: str) -> Optional[Dict[str, Any]]:
                 "dest_code": dstn_code,
                 "fetch_timestamp": now_ts
             }
-            NTES_CACHE[t_no] = anchor_data
+            NTES_CACHE[t_no] = dict(anchor_data)
             NTES_CACHE_TIMESTAMP[t_no] = now_ts
+            anchor_data["train_no"] = raw_no
             return anchor_data
 
         # Case 2: Train has completed journey / reached final destination
@@ -82,8 +87,9 @@ def get_live_ntes_anchor(train_no: str) -> Optional[Dict[str, Any]]:
                 "dest_code": dstn_code,
                 "fetch_timestamp": now_ts
             }
-            NTES_CACHE[t_no] = anchor_data
+            NTES_CACHE[t_no] = dict(anchor_data)
             NTES_CACHE_TIMESTAMP[t_no] = now_ts
+            anchor_data["train_no"] = raw_no
             return anchor_data
 
         # Case 3: Train is actively running on tracks
@@ -121,8 +127,9 @@ def get_live_ntes_anchor(train_no: str) -> Optional[Dict[str, Any]]:
             "fetch_timestamp": now_ts
         }
 
-        NTES_CACHE[t_no] = anchor_data
+        NTES_CACHE[t_no] = dict(anchor_data)
         NTES_CACHE_TIMESTAMP[t_no] = now_ts
+        anchor_data["train_no"] = raw_no
         return anchor_data
 
     except Exception:

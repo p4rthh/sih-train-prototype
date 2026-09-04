@@ -54,10 +54,17 @@ def init_db():
     conn.commit()
     conn.close()
 
+TRAIN_ALIASES = {
+    "12095": "12952",
+    "12096": "12951",
+}
+
 def search_trains(query: str, limit: int = 15) -> List[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
-    q = f"%{query.strip()}%"
+    raw_q = query.strip()
+    resolved_q = TRAIN_ALIASES.get(raw_q, raw_q)
+    q = f"%{resolved_q}%"
     cursor.execute("""
         SELECT DISTINCT train_number, train_name 
         FROM schedules 
@@ -66,17 +73,109 @@ def search_trains(query: str, limit: int = 15) -> List[Dict[str, Any]]:
             CASE WHEN train_number LIKE ? THEN 1 ELSE 2 END,
             train_number
         LIMIT ?
-    """, (q, q, f"{query.strip()}%", limit))
+    """, (q, q, f"{resolved_q}%", limit))
     rows = cursor.fetchall()
     conn.close()
-    return [{"train_number": r["train_number"], "train_name": r["train_name"]} for r in rows]
+    
+    results = [{"train_number": r["train_number"], "train_name": r["train_name"]} for r in rows]
+    if raw_q in TRAIN_ALIASES and not any(r["train_number"] == raw_q for r in results):
+        results.insert(0, {"train_number": raw_q, "train_name": f"MMCT TEJAS RAJ ({resolved_q})"})
+    return results
+
+STATION_CODE_ALIASES = {
+    "MMCT": "BCT",
+    "BCT": "MMCT",
+    "PRYJ": "ALD",
+    "ALD": "PRYJ",
+    "DDU": "MGS",
+    "MGS": "DDU",
+    "AY": "AYC",
+    "AYC": "AY",
+    "LKO": "LJN",
+    "LJN": "LKO",
+    "CSMT": "CSTM",
+    "CSTM": "CSMT"
+}
+
+LIVE_SCHEDULE_CACHE: Dict[str, List[Dict[str, Any]]] = {}
 
 def get_train_schedule(train_no: str) -> List[Dict[str, Any]]:
+    raw_no = str(train_no).strip()
+    t_no = TRAIN_ALIASES.get(raw_no, raw_no)
+
+    if t_no in LIVE_SCHEDULE_CACHE:
+        return LIVE_SCHEDULE_CACHE[t_no]
+
+    # Query official live timetable schedule from NTES
+    try:
+        from ntes import NTESClient
+        client = NTESClient()
+        res = client.schedule(t_no)
+        if res and isinstance(res, dict) and res.get("stations"):
+            stops = []
+            prev_dist = 0.0
+            t_name = res.get("TrainName") or f"Train {t_no}"
+            for s in res.get("stations", []):
+                stn_code = str(s.get("StationCode") or "").strip().upper()
+                stn_info = get_station_info(stn_code) or {}
+                cum_dist = float(s.get("Distance") or 0.0)
+                sec_km = max(1.0, cum_dist - prev_dist) if stops else 0.0
+                prev_dist = cum_dist
+
+                arr = str(s.get("STA") or "").strip()
+                dep = str(s.get("STD") or "").strip()
+                if arr and len(arr) == 5:
+                    arr += ":00"
+                if dep and len(dep) == 5:
+                    dep += ":00"
+                if not arr:
+                    arr = "START"
+                if not dep:
+                    dep = "None"
+
+                stops.append({
+                    "seq": int(s.get("Sr", len(stops) + 1)),
+                    "train_number": t_no,
+                    "train_name": t_name,
+                    "station_code": stn_code,
+                    "station_name": s.get("StationName") or stn_info.get("station_name", stn_code),
+                    "arrival": arr,
+                    "departure": dep,
+                    "day": int(s.get("Day", 1)),
+                    "halt_min": int(s.get("Halt", 0)),
+                    "lat": stn_info.get("lat") or 28.6139,
+                    "lon": stn_info.get("lon") or 77.2090,
+                    "section_km": sec_km,
+                    "cum_dist_km": cum_dist
+                })
+
+            if len(stops) >= 2:
+                LIVE_SCHEDULE_CACHE[t_no] = stops
+                try:
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute("DELETE FROM schedules WHERE train_number = ?", (t_no,))
+                    c.executemany("""
+                        INSERT INTO schedules (train_number, train_name, seq, station_code, station_name, arrival, departure, day, halt_min)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, [
+                        (st["train_number"], st["train_name"], st["seq"], st["station_code"], st["station_name"], st["arrival"], st["departure"], st["day"], st["halt_min"])
+                        for st in stops
+                    ])
+                    conn.commit()
+                    conn.close()
+                except Exception:
+                    pass
+                return stops
+    except Exception:
+        pass
+
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT 
             s.seq,
+            s.train_number,
             s.train_name,
             s.station_code,
             s.station_name,
@@ -90,16 +189,32 @@ def get_train_schedule(train_no: str) -> List[Dict[str, Any]]:
         LEFT JOIN stations st ON s.station_code = st.station_code
         WHERE s.train_number = ?
         ORDER BY s.seq ASC
-    """, (str(train_no).strip(),))
+    """, (t_no,))
     rows = cursor.fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+
+    result = []
+    for r in rows:
+        d = dict(r)
+        if not d.get("lat") or not d.get("lon"):
+            code = d.get("station_code", "").upper()
+            if code in STATION_CODE_ALIASES:
+                stn = get_station_info(STATION_CODE_ALIASES[code])
+                if stn:
+                    d["lat"] = stn.get("lat")
+                    d["lon"] = stn.get("lon")
+        result.append(d)
+    return result
 
 def get_station_info(station_code: str) -> Optional[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM stations WHERE station_code = ?", (station_code.strip().upper(),))
+    code = station_code.strip().upper()
+    cursor.execute("SELECT * FROM stations WHERE station_code = ?", (code,))
     row = cursor.fetchone()
+    if not row and code in STATION_CODE_ALIASES:
+        cursor.execute("SELECT * FROM stations WHERE station_code = ?", (STATION_CODE_ALIASES[code],))
+        row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
 

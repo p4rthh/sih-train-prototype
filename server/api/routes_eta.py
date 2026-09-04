@@ -2,7 +2,10 @@ import datetime
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Query
 
-from server.database import search_trains, get_train_schedule, get_db_connection, find_trains_between_stations, search_stations, resolve_station_code
+from server.database import (
+    search_trains, get_train_schedule, get_db_connection, find_trains_between_stations,
+    search_stations, resolve_station_code, TRAIN_ALIASES
+)
 from server.ingestion.weather_client import WeatherClient
 from server.ingestion.ntes_anchor import get_live_ntes_anchor
 from server.ingestion.pnr_resolver import resolve_pnr_status
@@ -61,13 +64,14 @@ def parse_schedule_time(time_str: Optional[str], day_offset: int = 1, base_date:
         return None
 
 def get_or_create_simulator(train_no: str) -> TrainSimulator:
-    t_no = str(train_no).strip()
+    raw_no = str(train_no).strip()
+    t_no = TRAIN_ALIASES.get(raw_no, raw_no)
     now_ist = datetime.datetime.now(IST)
 
     if t_no not in ACTIVE_SIMULATORS:
         schedule = get_train_schedule(t_no)
         if not schedule:
-            raise HTTPException(status_code=404, detail=f"Train #{t_no} schedule not found in database")
+            raise HTTPException(status_code=404, detail=f"Train #{raw_no} schedule not found in database")
         
         sim = TrainSimulator(t_no, schedule)
 
@@ -75,8 +79,9 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
         if anchor:
             run_st = anchor.get("run_status", "RUNNING")
             stn = anchor.get("last_station_code") or sim.route_stops[0]["station_code"]
+            nxt_stn = anchor.get("next_station_code")
             del_m = float(anchor.get("current_delay_min") or 0.0)
-            sim.anchor_to_ntes(stn, del_m, run_status=run_st)
+            sim.anchor_to_ntes(stn, del_m, run_status=run_st, next_station_code=nxt_stn)
             SIMULATOR_SOURCE[t_no] = "NTES_REALTIME"
             SIMULATOR_DESC[t_no] = anchor.get("position_desc") or f"Live at {stn} (+{int(del_m)}m delay)"
         else:
@@ -105,10 +110,11 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
     if anchor:
         run_st = anchor.get("run_status", "RUNNING")
         stn = anchor.get("last_station_code") or sim.route_stops[0]["station_code"]
+        nxt_stn = anchor.get("next_station_code")
         del_m = float(anchor.get("current_delay_min") or 0.0)
         curr_code = sim.route_stops[min(sim.current_stop_idx, len(sim.route_stops)-1)]["station_code"].upper()
         if curr_code != stn.upper() or sim.status != run_st:
-            sim.anchor_to_ntes(stn, del_m, run_status=run_st)
+            sim.anchor_to_ntes(stn, del_m, run_status=run_st, next_station_code=nxt_stn)
             SIMULATOR_SOURCE[t_no] = "NTES_REALTIME"
             SIMULATOR_DESC[t_no] = anchor.get("position_desc") or f"Live at {stn}"
     
@@ -166,7 +172,9 @@ def get_schedule_endpoint(train_no: str):
 
 @router.get("/train/{train_no}/eta", response_model=ETAResponse)
 def get_train_eta_endpoint(train_no: str):
-    sim = get_or_create_simulator(train_no)
+    raw_no = str(train_no).strip()
+    t_no = TRAIN_ALIASES.get(raw_no, raw_no)
+    sim = get_or_create_simulator(t_no)
     state = sim.get_state()
 
     stn_code = state["current_station_code"]
@@ -188,7 +196,7 @@ def get_train_eta_endpoint(train_no: str):
         window_upper_min = 2.0
         orig_dep = sim.route_stops[0].get("departure") or "--:--"
         reasons_list = [{
-            "reason": f"🚉 Train yet to start from source platform — Waiting for scheduled departure ({orig_dep})",
+            "reason": f"Train yet to start from source platform — Waiting for scheduled departure ({orig_dep})",
             "severity": "LOW",
             "impact_min": 0.0
         }]
@@ -197,7 +205,7 @@ def get_train_eta_endpoint(train_no: str):
         window_lower_min = 0.0
         window_upper_min = 0.0
         reasons_list = [{
-            "reason": "🏁 Train has reached final destination terminal — Journey completed",
+            "reason": "Train has reached destination terminal — Journey completed",
             "severity": "LOW",
             "impact_min": 0.0
         }]
@@ -225,7 +233,7 @@ def get_train_eta_endpoint(train_no: str):
             reasons_list = shap_explainer.explain(feat_df)
         else:
             reasons_list = [{
-                "reason": "🟢 Operational cruising speed — normal signal clearance",
+                "reason": "Operational cruising speed — normal signal clearance",
                 "severity": "LOW",
                 "impact_min": 0.0
             }]
@@ -234,17 +242,24 @@ def get_train_eta_endpoint(train_no: str):
         window_lower_min = curr_delay + 1.0
         window_upper_min = curr_delay + 9.0
         reasons_list = [{
-            "reason": "🟢 Operational cruising speed — normal signal clearance",
+            "reason": "Operational cruising speed — normal signal clearance",
             "severity": "LOW",
             "impact_min": 0.0
         }]
 
     nxt_idx = 0 if is_yet_to_start else min(state["current_stop_idx"] + 1, len(sim.route_stops) - 1)
     nxt_stop = sim.route_stops[nxt_idx]
-    sched_str = nxt_stop.get("arrival") or nxt_stop.get("departure") or "--:--"
 
     if is_yet_to_start:
-        point_eta_dt = parse_schedule_time(sched_str, nxt_stop.get("day", 1), now_ist.date()) or now_ist
+        raw_sched = sim.route_stops[0].get("departure") or "--:--"
+    elif is_completed:
+        raw_sched = sim.route_stops[-1].get("arrival") or "--:--"
+    else:
+        raw_sched = nxt_stop.get("arrival") or nxt_stop.get("departure") or "--:--"
+    sched_str = str(raw_sched)[:5] if len(str(raw_sched)) >= 5 and str(raw_sched) != "START" else str(raw_sched)
+
+    if is_yet_to_start:
+        point_eta_dt = parse_schedule_time(sched_str, sim.route_stops[0].get("day", 1), now_ist.date()) or now_ist
         lower_eta_dt = point_eta_dt
         upper_eta_dt = point_eta_dt
     elif is_completed:
@@ -371,7 +386,7 @@ def get_train_eta_endpoint(train_no: str):
 
     if dest_recovered_min >= 6.0:
         reasons_list.append({
-            "reason": f"🌙 Overnight Speedup & Buffer Slack — Historical patterns show train recovers {int(dest_recovered_min)}m delay before terminal",
+            "reason": f"Overnight speedup and buffer slack: historical patterns show train recovers {int(dest_recovered_min)}m delay before terminal",
             "severity": "LOW",
             "impact_min": -round(dest_recovered_min, 1)
         })
@@ -385,7 +400,7 @@ def get_train_eta_endpoint(train_no: str):
     curr_speed = 0.0 if (is_yet_to_start or is_completed) else state["speed_kmh"]
 
     return ETAResponse(
-        train_no=sim.train_no,
+        train_no=raw_no,
         train_name=sim.train_name,
         current_station_code=curr_stn_code,
         current_station_name=curr_stn_name,
@@ -406,8 +421,8 @@ def get_train_eta_endpoint(train_no: str):
         ),
         delay_reasons=[DelayReason(**r) for r in reasons_list],
         route_progress=route_progress,
-        telemetry_source=SIMULATOR_SOURCE.get(sim.train_no, "NTES_REALTIME"),
-        live_position_desc=SIMULATOR_DESC.get(sim.train_no),
+        telemetry_source=SIMULATOR_SOURCE.get(t_no, SIMULATOR_SOURCE.get(sim.train_no, "NTES_REALTIME")),
+        live_position_desc=SIMULATOR_DESC.get(t_no, SIMULATOR_DESC.get(sim.train_no)),
         model_b_stgcn_delta=round(pred_delta_stgcn, 2),
         ensemble_blend_ratio=f"{int(stacking_ensemble.w_lgb * 100)}% LightGBM + {int(stacking_ensemble.w_stgcn * 100)}% ST-GCN",
         dest_delay_recovery_min=round(dest_recovered_min, 1),

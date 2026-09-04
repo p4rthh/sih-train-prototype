@@ -79,7 +79,7 @@ class TrainSimulator:
                 {"seq": 5, "station_code": "BCT", "station_name": "MUMBAI CENTRAL", "lat": 18.9707, "lon": 72.8194, "section_km": 654.0, "cum_dist_km": 1386.0, "halt_min": 0},
             ]
 
-    def anchor_to_ntes(self, last_station_code: str, delay_min: float, run_status: str = "RUNNING", speed_kmh: float = 85.0) -> bool:
+    def anchor_to_ntes(self, last_station_code: str, delay_min: float, run_status: str = "RUNNING", speed_kmh: float = 85.0, next_station_code: Optional[str] = None) -> bool:
         if run_status == "YET_TO_START":
             self.current_stop_idx = 0
             self.current_lat = self.route_stops[0]["lat"]
@@ -110,6 +110,13 @@ class TrainSimulator:
                 found_idx = idx
                 break
 
+        if found_idx is None and next_station_code:
+            target_nxt = str(next_station_code).strip().upper()
+            for idx, stop in enumerate(self.route_stops):
+                if stop["station_code"].upper() == target_nxt and idx > 0:
+                    found_idx = idx - 1
+                    break
+
         if found_idx is not None:
             self.current_stop_idx = min(found_idx, len(self.route_stops) - 2)
             self.current_lat = self.route_stops[found_idx]["lat"]
@@ -121,7 +128,15 @@ class TrainSimulator:
             self.status = "RUNNING"
             return True
 
-        return False
+        self.current_stop_idx = 0
+        self.current_lat = self.route_stops[0]["lat"]
+        self.current_lon = self.route_stops[0]["lon"]
+        self.current_delay_min = float(delay_min)
+        self.delay_history = [max(0.0, delay_min - 3.0), float(delay_min)]
+        self.current_speed_kmh = speed_kmh
+        self.section_dist_covered_km = 0.0
+        self.status = "RUNNING"
+        return True
 
     def sync_to_current_time(self) -> bool:
         now_ist = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
