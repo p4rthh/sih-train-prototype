@@ -89,6 +89,24 @@ export const TrainStatusBanner: React.FC<Props> = ({ data, isConnected }) => {
         )}
       </View>
 
+      {/* Historical Behavioral Recovery Badge */}
+      {data.dest_delay_recovery_min !== undefined && data.dest_delay_recovery_min > 3 && (
+        <View style={styles.recoveryBanner}>
+          <Text style={styles.recoveryIcon}>🌙</Text>
+          <View style={styles.recoveryTextCol}>
+            <Text style={styles.recoveryTitle}>
+              Catch-Up Dynamic: -{Math.round(data.dest_delay_recovery_min)}m Projected Recovery
+            </Text>
+            <Text style={styles.recoverySub}>
+              {data.is_overnight_recovery_active
+                ? "Overnight green corridor & timetable slack recovering delay before terminal"
+                : "Scheduled buffer margin absorption closing intermediate delay before arrival"}
+              {data.historical_on_time_pct ? ` • ${Math.round(data.historical_on_time_pct)}% Punctuality Score` : ""}
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* Streaming Health Dot */}
       <View style={styles.footerRow}>
         <View style={styles.streamIndicator}>
@@ -279,5 +297,35 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
     color: "#a78bfa",
+  },
+  recoveryBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(52, 211, 153, 0.35)",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+  },
+  recoveryIcon: {
+    fontSize: 16,
+    marginRight: 8,
+    marginTop: 1,
+  },
+  recoveryTextCol: {
+    flex: 1,
+  },
+  recoveryTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#6ee7b7",
+    marginBottom: 2,
+  },
+  recoverySub: {
+    fontSize: 11,
+    color: "#a7f3d0",
+    lineHeight: 15,
   },
 });

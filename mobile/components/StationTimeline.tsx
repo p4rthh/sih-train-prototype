@@ -76,6 +76,16 @@ export const StationTimeline: React.FC<Props> = ({ stops }) => {
                     >
                       {stop.delay_min > 0 ? `+${Math.round(stop.delay_min)}m` : "On Time"}
                     </Text>
+                    {stop.is_recovered && (
+                      <View style={styles.recoveredPill}>
+                        <Text style={styles.recoveredText}>🟢 Recovered</Text>
+                      </View>
+                    )}
+                    {!stop.is_recovered && (stop.recovered_min ?? 0) > 4 && (
+                      <Text style={styles.slackRecoveredText}>
+                        (-{Math.round(stop.recovered_min!)}m slack)
+                      </Text>
+                    )}
                   </View>
                 )}
               </View>
@@ -205,7 +215,10 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   delayTagRow: {
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 2,
+    flexWrap: "wrap",
   },
   delayTag: {
     fontSize: 10,
@@ -216,5 +229,23 @@ const styles = StyleSheet.create({
   },
   delayOnTime: {
     color: "#16a34a",
+  },
+  recoveredPill: {
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: 6,
+  },
+  recoveredText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#059669",
+  },
+  slackRecoveredText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#10b981",
+    marginLeft: 6,
   },
 });

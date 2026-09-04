@@ -72,4 +72,11 @@ class DelayReasonEngine:
         elif feature == "fog_severity_index" and value > 0.7:
             return "🌫️ Dense corridor-wide fog — Systematic speed restriction active", "HIGH"
 
+        elif feature == "is_overnight_recovery_window" and int(value) == 1:
+            return "🌙 Overnight Speedup — Low traffic & green signals (23:00–05:30) enabling MPS catch-up", "LOW"
+        elif feature == "recovery_slack_min" and value >= 5.0:
+            return f"⏱️ Scheduled Slack Buffer ({int(value)} min) — Absorbing intermediate delay into timetable margin", "LOW"
+        elif feature == "hist_recovery_rate" and value >= 0.8:
+            return f"🚄 High Historical Catch-Up ({int(value * 100)}%) — Train historically recovers delay before destination", "LOW"
+
         return "", "LOW"

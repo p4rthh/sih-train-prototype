@@ -29,6 +29,8 @@ class RouteStop(BaseModel):
     eta: Optional[str] = None
     lat: Optional[float] = None
     lon: Optional[float] = None
+    is_recovered: Optional[bool] = False
+    recovered_min: Optional[float] = 0.0
 
 class ETAResponse(BaseModel):
     train_no: str
@@ -50,6 +52,10 @@ class ETAResponse(BaseModel):
     live_position_desc: Optional[str] = None
     model_b_stgcn_delta: Optional[float] = None
     ensemble_blend_ratio: Optional[str] = "62% LightGBM + 38% ST-GCN"
+    dest_delay_recovery_min: Optional[float] = 0.0
+    dest_forecasted_delay_min: Optional[float] = 0.0
+    historical_on_time_pct: Optional[float] = 90.0
+    is_overnight_recovery_active: Optional[bool] = False
 
 class StationBoardItem(BaseModel):
     train_number: str

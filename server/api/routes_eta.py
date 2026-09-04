@@ -13,6 +13,8 @@ from server.models.stgcn_model import DelaySTGCN
 from server.models.ensemble import StackingEnsemble
 from server.models.conformal_uq import ConformalCalibrator
 from server.models.explainer import DelayReasonEngine
+from server.models.recovery_engine import HistoricalRecoveryEngine
+from server.ingestion.historical_profiles import HistoricalProfileManager
 from server.api.schemas import (
     TrainSearchResult, ETAResponse, DynamicETA, ConfidenceInterval,
     DelayReason, RouteStop, StationBoardItem, RouteSearchResultItem,
@@ -222,10 +224,24 @@ def get_train_eta_endpoint(train_no: str):
     lower_eta_dt = max(now_ist + datetime.timedelta(minutes=1.0), point_eta_dt - datetime.timedelta(minutes=cqr_margin))
     upper_eta_dt = point_eta_dt + datetime.timedelta(minutes=cqr_margin + 2.0)
 
+    priority_rank = state.get("priority_rank", 2)
+    hist_profile = HistoricalProfileManager.get_profile(sim.train_no, priority_rank)
+    recovery_traj = HistoricalRecoveryEngine.compute_corridor_recovery_trajectory(
+        train_no=sim.train_no,
+        priority_rank=priority_rank,
+        route_stops=sim.route_stops,
+        current_stop_idx=state["current_stop_idx"],
+        current_delay_min=forecasted_delay,
+        start_time_ist=point_eta_dt
+    )
+
     route_progress = []
     prev_milestone_dt = point_eta_dt
 
     for idx, stop in enumerate(sim.route_stops):
+        is_rec = False
+        rec_amt = 0.0
+
         if idx < state["current_stop_idx"]:
             status = "departed"
             d_min = state["delay_history"][min(idx, len(state["delay_history"])-1)]
@@ -247,7 +263,12 @@ def get_train_eta_endpoint(train_no: str):
                 pred_delta_stgcn,
                 hop_dist=hop_hops
             )
-            d_min = max(0.0, curr_delay + multihop_delta)
+            rec_node = recovery_traj[idx] if idx < len(recovery_traj) else {}
+            base_rec_delay = rec_node.get("forecasted_delay_min", curr_delay)
+            d_min = max(0.0, round(base_rec_delay + (multihop_delta * 0.2), 1))
+            is_rec = bool(rec_node.get("is_recovered", False))
+            rec_amt = float(rec_node.get("recovered_min", 0.0))
+
             stn_sched_str = stop.get("arrival") or stop.get("departure")
             s_dt = parse_schedule_time(stn_sched_str, stop.get("day", 1), now_ist.date())
             if s_dt is not None:
@@ -272,8 +293,22 @@ def get_train_eta_endpoint(train_no: str):
             delay_min=round(d_min, 1) if d_min is not None else None,
             eta=eta_time,
             lat=stop.get("lat"),
-            lon=stop.get("lon")
+            lon=stop.get("lon"),
+            is_recovered=is_rec,
+            recovered_min=round(rec_amt, 1)
         ))
+
+    dest_stop_info = recovery_traj[-1] if recovery_traj else {}
+    dest_forecast_delay = float(dest_stop_info.get("forecasted_delay_min", 0.0))
+    dest_recovered_min = float(dest_stop_info.get("recovered_min", 0.0))
+    is_overnight = HistoricalRecoveryEngine.is_overnight_window(now_ist)
+
+    if dest_recovered_min >= 6.0:
+        reasons_list.append({
+            "reason": f"🌙 Overnight Speedup & Buffer Slack — Historical patterns show train recovers {int(dest_recovered_min)}m delay before terminal",
+            "severity": "LOW",
+            "impact_min": -round(dest_recovered_min, 1)
+        })
 
     return ETAResponse(
         train_no=sim.train_no,
@@ -300,7 +335,11 @@ def get_train_eta_endpoint(train_no: str):
         telemetry_source=SIMULATOR_SOURCE.get(sim.train_no, "NTES_REALTIME"),
         live_position_desc=SIMULATOR_DESC.get(sim.train_no),
         model_b_stgcn_delta=round(pred_delta_stgcn, 2),
-        ensemble_blend_ratio=f"{int(stacking_ensemble.w_lgb * 100)}% LightGBM + {int(stacking_ensemble.w_stgcn * 100)}% ST-GCN"
+        ensemble_blend_ratio=f"{int(stacking_ensemble.w_lgb * 100)}% LightGBM + {int(stacking_ensemble.w_stgcn * 100)}% ST-GCN",
+        dest_delay_recovery_min=round(dest_recovered_min, 1),
+        dest_forecasted_delay_min=round(dest_forecast_delay, 1),
+        historical_on_time_pct=float(hist_profile.get("historical_on_time_pct", 90.0)),
+        is_overnight_recovery_active=is_overnight
     )
 
 @router.get("/station/{station_code}/board", response_model=List[StationBoardItem])

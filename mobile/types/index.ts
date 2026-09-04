@@ -30,6 +30,8 @@ export interface RouteStop {
   eta?: string;
   lat?: number;
   lon?: number;
+  is_recovered?: boolean;
+  recovered_min?: number;
 }
 
 export interface ETAResponse {
@@ -52,6 +54,10 @@ export interface ETAResponse {
   live_position_desc?: string;
   model_b_stgcn_delta?: number;
   ensemble_blend_ratio?: string;
+  dest_delay_recovery_min?: number;
+  dest_forecasted_delay_min?: number;
+  historical_on_time_pct?: number;
+  is_overnight_recovery_active?: boolean;
 }
 
 export interface StationBoardItem {

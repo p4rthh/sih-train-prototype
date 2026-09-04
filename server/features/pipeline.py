@@ -2,6 +2,7 @@ import math
 import datetime
 import pandas as pd
 from typing import Dict, Any, List, Optional
+from server.models.recovery_engine import HistoricalRecoveryEngine
 
 FEATURE_NAMES = [
     "current_delay_min",
@@ -28,7 +29,11 @@ FEATURE_NAMES = [
     "weather_code",
     "fog_severity_index",
     "upstream_train_delay",
-    "is_loco_reversal"
+    "is_loco_reversal",
+    "hist_recovery_rate",
+    "is_overnight_recovery_window",
+    "dist_to_destination_km",
+    "hist_on_time_pct"
 ]
 
 class FeaturePipeline:
@@ -67,6 +72,14 @@ class FeaturePipeline:
         vis = float(weather.get("visibility_m", 10000.0))
         fog_idx = float(weather.get("fog_severity_index", 0.0))
 
+        # Historical behavior profiles
+        train_no = str(state.get("train_no", "12952"))
+        priority = int(state.get("priority_rank", 2))
+        profile = HistoricalRecoveryEngine.get_historical_train_profile(train_no, priority)
+
+        is_overnight = 1 if (hour >= 22.5 or hour <= 5.5) else 0
+        rem_dist = float(state.get("dist_to_destination_km", max(20.0, (tot_stops - stop_idx) * 25.0)))
+
         row = {
             "current_delay_min": curr_delay,
             "lag_delay_1": lag_1,
@@ -77,7 +90,7 @@ class FeaturePipeline:
             "section_distance_km": float(state.get("section_distance_km", 15.0)),
             "track_capacity": int(state.get("track_capacity", 2)),
             "max_permitted_speed": float(state.get("max_permitted_speed", 110.0)),
-            "train_priority": int(state.get("priority_rank", 2)),
+            "train_priority": priority,
             "sched_dwell_min": sched_dwell,
             "recovery_slack_min": float(state.get("recovery_slack_min", 4.0)),
             "trip_progress_ratio": progress_ratio,
@@ -92,7 +105,11 @@ class FeaturePipeline:
             "weather_code": int(weather.get("weather_code", 1)),
             "fog_severity_index": fog_idx,
             "upstream_train_delay": float(state.get("upstream_train_delay", 0.0)),
-            "is_loco_reversal": is_reversal
+            "is_loco_reversal": is_reversal,
+            "hist_recovery_rate": float(profile["recovery_rate"]),
+            "is_overnight_recovery_window": is_overnight,
+            "dist_to_destination_km": rem_dist,
+            "hist_on_time_pct": float(profile["punctuality"])
         }
 
         return pd.DataFrame([row])[FEATURE_NAMES]
