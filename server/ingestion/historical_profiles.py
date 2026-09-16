@@ -122,26 +122,26 @@ class HistoricalProfileManager:
 
         # Synthesize profile from priority rank if individual train not in curated list
         if priority_rank == 1:
-            rec_rate, on_time, overnight = 0.85, 90.0, 1.45
+            dep_del, arr_del, rec_rate, on_time, overnight = 6.0, 14.0, 0.85, 86.0, 1.45
         elif priority_rank == 2:
-            rec_rate, on_time, overnight = 0.70, 82.0, 1.30
+            dep_del, arr_del, rec_rate, on_time, overnight = 15.0, 28.0, 0.70, 72.0, 1.30
         elif priority_rank == 3:
-            rec_rate, on_time, overnight = 0.45, 70.0, 1.15
+            dep_del, arr_del, rec_rate, on_time, overnight = 22.0, 38.0, 0.50, 60.0, 1.15
         elif priority_rank == 4:
-            rec_rate, on_time, overnight = 0.30, 60.0, 1.05
+            dep_del, arr_del, rec_rate, on_time, overnight = 25.0, 44.0, 0.35, 55.0, 1.05
         else:
-            rec_rate, on_time, overnight = 0.10, 45.0, 1.00
+            dep_del, arr_del, rec_rate, on_time, overnight = 35.0, 68.0, 0.15, 40.0, 1.00
 
         return {
             "train_name": f"Train {train_no}",
             "route": "Pan-India Route",
             "historical_on_time_pct": on_time,
-            "avg_departure_delay_min": 6.0,
-            "avg_arrival_delay_min": 5.0,
+            "avg_departure_delay_min": dep_del,
+            "avg_arrival_delay_min": arr_del,
             "median_recovery_rate": rec_rate,
             "overnight_recovery_mps": overnight,
-            "terminal_slack_buffer_min": 15.0,
+            "terminal_slack_buffer_min": 20.0,
             "common_delay_hotspots": ["Major Junctions"],
             "recovery_sections": ["Clear Double Track Sections"],
-            "historical_runs_analyzed": 60
+            "historical_runs_analyzed": 120
         }

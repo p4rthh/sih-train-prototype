@@ -1,0 +1,296 @@
+<!DOCTYPE html><html lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Train Punctuality Analysis</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><link href="https://fonts.cdnfonts.com/css/samarkan" rel="stylesheet" class="">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&amp;family=Samarkan&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary-fixed-variant": "#00531f",
+                      "on-error": "#ffffff",
+                      "on-tertiary": "#ffffff",
+                      "surface-container": "#ffe8eb",
+                      "primary-fixed-dim": "#ffb1c2",
+                      "inverse-surface": "#3c2c2f",
+                      "on-primary": "#ffffff",
+                      "secondary": "#655d53",
+                      "error-container": "#ffdad6",
+                      "error": "#ba1a1a",
+                      "background": "#fff8f7",
+                      "surface-tint": "#b71456",
+                      "surface-dim": "#eed4d8",
+                      "tertiary-fixed-dim": "#70dd82",
+                      "surface-container-low": "#fff0f1",
+                      "on-surface-variant": "#594045",
+                      "on-surface": "#26181b",
+                      "outline": "#8d7075",
+                      "on-secondary-container": "#6b6358",
+                      "tertiary-fixed": "#8dfa9b",
+                      "primary": "#b10b52",
+                      "secondary-fixed": "#ece1d3",
+                      "on-secondary-fixed": "#201b13",
+                      "inverse-primary": "#ffb1c2",
+                      "surface-container-high": "#fce2e6",
+                      "inverse-on-surface": "#ffecee",
+                      "surface": "#fff8f7",
+                      "on-primary-container": "#fff7f7",
+                      "tertiary-container": "#008536",
+                      "surface-bright": "#fff8f7",
+                      "surface-container-lowest": "#ffffff",
+                      "on-primary-fixed-variant": "#8f0040",
+                      "on-primary-fixed": "#3f0018",
+                      "secondary-container": "#ece1d3",
+                      "surface-container-highest": "#f6dce0",
+                      "primary-fixed": "#ffd9e0",
+                      "on-secondary": "#ffffff",
+                      "tertiary": "#006929",
+                      "on-secondary-fixed-variant": "#4d463c",
+                      "on-background": "#26181b",
+                      "on-tertiary-fixed": "#002108",
+                      "outline-variant": "#e0bec4",
+                      "surface-variant": "#f6dce0",
+                      "secondary-fixed-dim": "#d0c5b8",
+                      "on-tertiary-container": "#ecffe8",
+                      "on-error-container": "#93000a",
+                      "primary-container": "#d32f6a"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "lg": "24px",
+                      "sm": "8px",
+                      "xl": "32px",
+                      "unit": "4px",
+                      "md": "16px",
+                      "gutter": "12px",
+                      "xs": "4px",
+                      "container-margin": "16px"
+              },
+              "fontFamily": {
+                      "label-sm": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "display-lg": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "label-bold": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "22px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "display-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "800"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-bold": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        .samarkan-font {
+            font-family: 'Samarkan', sans-serif;
+        }
+        .arch-mask {
+            clip-path: ellipse(150% 100% at 50% 0%);
+        }
+      </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background pb-safe flex flex-col min-h-screen" style="background-color: rgb(248, 203, 200);">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 px-4 flex items-center shadow-md h-16 rounded-b-[2rem] justify-center" style="background-color: rgb(253, 239, 222); border-bottom: 1px solid rgba(230, 57, 110, 0.15);">
+
+<div class="text-headline-lg-mobile font-headline-lg-mobile tracking-tight text-on-primary" style="font-family: Samarkan, sans-serif; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; color: rgb(230, 57, 110); font-style: normal; white-space: nowrap;">Navarail</div>
+
+</header>
+<main class="flex-grow pb-24 px-container-margin flex flex-col gap-lg md:max-w-2xl md:mx-auto w-full" style="padding-top: 84px;">
+<!-- Header Section -->
+<div class="flex flex-col gap-sm">
+<h1 class="text-headline-lg-mobile font-headline-lg-mobile font-bold tracking-tight" style="color: rgb(230, 57, 110); font-family: Inter, sans-serif;">Train Behavior Analysis</h1>
+<div class="bg-surface rounded-xl shadow-sm border border-outline-variant p-md flex justify-between items-center" style="background-color: rgb(253, 239, 222); border-color: rgba(230, 57, 110, 0.2);">
+<div>
+<h2 class="text-headline-md font-headline-md text-on-surface">12952</h2>
+<p class="text-body-md font-body-md text-on-surface-variant">Rajdhani Express</p>
+</div>
+<div class="text-right">
+<p class="text-label-sm font-label-sm text-on-surface-variant mb-xs">7-Day Reliability</p>
+<div class="flex items-center gap-xs justify-end">
+<span class="text-headline-md font-headline-md text-tertiary">85%</span>
+<span class="bg-tertiary-fixed-dim text-on-tertiary-fixed-variant px-2 py-0.5 rounded-full text-label-bold font-label-bold" style="background-color: rgb(248, 203, 200); color: rgb(230, 57, 110);">Good</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Pattern Card -->
+<div class="bg-surface rounded-xl shadow-sm border border-outline-variant p-md flex flex-col gap-md" style="background-color: rgb(253, 239, 222); border-color: rgba(230, 57, 110, 0.2);">
+<h3 class="text-headline-md font-headline-md font-bold tracking-tight" style="color: rgb(230, 57, 110); font-family: Inter, sans-serif;">Punctuality Pattern</h3>
+<!-- Simple Bar Chart (Last 7 Days) -->
+<div class="flex items-end justify-between h-48 mt-sm gap-2"><!-- Day 1 -->
+<div class="flex flex-col items-center gap-2 w-full">
+  <span class="text-label-sm font-label-sm text-on-surface-variant">+12m</span>
+  <div class="w-full rounded-t-sm" style="height: 40%; background-color: #E6396E;"></div>
+  <span class="text-label-sm font-label-sm text-on-surface-variant font-bold">Mon</span>
+</div>
+<!-- Day 2 -->
+<div class="flex flex-col items-center gap-2 w-full">
+  <span class="text-label-sm font-label-sm text-on-surface-variant">+15m</span>
+  <div class="w-full rounded-t-sm" style="height: 50%; background-color: #E6396E;"></div>
+  <span class="text-label-sm font-label-sm text-on-surface-variant font-bold">Tue</span>
+</div>
+<!-- Day 3 -->
+<div class="flex flex-col items-center gap-2 w-full">
+  <span class="text-label-sm font-label-sm text-on-surface-variant">+10m</span>
+  <div class="w-full rounded-t-sm" style="height: 30%; background-color: #E6396E;"></div>
+  <span class="text-label-sm font-label-sm text-on-surface-variant font-bold">Wed</span>
+</div>
+<!-- Day 4 -->
+<div class="flex flex-col items-center gap-2 w-full">
+  <span class="text-label-sm font-label-sm text-tertiary font-bold">0m</span>
+  <div class="w-full rounded-t-sm bg-tertiary-container" style="height: 8%;"></div>
+  <span class="text-label-sm font-label-sm text-on-surface-variant font-bold">Thu</span>
+</div>
+<!-- Day 5 -->
+<div class="flex flex-col items-center gap-2 w-full">
+  <span class="text-label-sm font-label-sm text-on-surface-variant">+20m</span>
+  <div class="w-full rounded-t-sm" style="height: 70%; background-color: #E6396E;"></div>
+  <span class="text-label-sm font-label-sm text-on-surface-variant font-bold">Fri</span>
+</div>
+<!-- Day 6 -->
+<div class="flex flex-col items-center gap-2 w-full">
+  <span class="text-label-sm font-label-sm text-on-surface-variant">+5m</span>
+  <div class="w-full rounded-t-sm" style="height: 18%; background-color: #E6396E;"></div>
+  <span class="text-label-sm font-label-sm text-on-surface-variant font-bold">Sat</span>
+</div>
+<!-- Day 7 -->
+<div class="flex flex-col items-center gap-2 w-full">
+  <span class="text-label-sm font-label-sm text-on-surface-variant">+12m</span>
+  <div class="w-full rounded-t-sm" style="height: 40%; background-color: #E6396E;"></div>
+  <span class="text-label-sm font-label-sm text-on-surface-variant font-bold">Sun</span>
+</div></div>
+</div>
+<!-- Insights Card -->
+<div class="bg-secondary-container rounded-xl shadow-sm p-md flex flex-col gap-md relative overflow-hidden" style="background-color: rgb(253, 239, 222); border: 1px solid rgba(230, 57, 110, 0.2);">
+<!-- Decorative Arch Pattern in Background -->
+<div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(circle at top, var(--tw-colors-primary-container) 0%, transparent 70%); clip-path: ellipse(120% 100% at 50% 0%);"></div>
+<h3 class="text-headline-md font-headline-md text-on-secondary-container relative z-10" style="color: rgb(230, 57, 110);">Insights</h3>
+
+<div class="flex gap-md items-start relative z-10"><div class="bg-tertiary-container text-on-tertiary-container p-2 rounded-full mt-1" style="background-color: rgb(248, 203, 200); color: rgb(230, 57, 110);"><span class="material-symbols-outlined">analytics</span></div><div><h4 class="text-body-lg font-body-lg font-bold text-on-secondary-container">Pattern Detected</h4><p class="text-body-md font-body-md text-on-secondary-container/80">This train is usually 10-15 minutes late arriving at Kota Jn. Plan your arrival at the station accordingly.</p></div></div></div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] md:hidden z-50 py-2 border-t" style="background-color: rgb(253, 239, 222); border-color: rgba(230, 57, 110, 0.2);">
+  <!-- Tab 1: Train View (Inactive) -->
+  <button class="flex flex-col items-center justify-center text-on-surface-variant flex-1 transition-colors py-1">
+    <span class="material-symbols-outlined mb-1">train</span>
+    <span class="text-label-sm font-label-sm">Train View</span>
+  </button>
+  <!-- Tab 2: Track (Inactive) -->
+  <button class="flex flex-col items-center justify-center text-on-surface-variant flex-1 transition-colors py-1"><span class="material-symbols-outlined mb-1">location_on</span>
+    <span class="text-label-sm font-label-sm">Track</span></button>
+  <!-- Tab 3: Behavior (Active) -->
+  <button class="flex flex-col items-center justify-center flex-1 transition-colors py-1" style="color: rgb(230, 57, 110);">
+    <div class="rounded-full px-4 py-1 mb-1 flex items-center justify-center" style="background-color: rgb(230, 57, 110); color: rgb(255, 255, 255);">
+      <span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">bar_chart</span>
+    </div>
+    <span class="text-label-sm font-label-bold font-bold" style="color: rgb(230, 57, 110);">Behavior</span>
+  </button>
+  <!-- Tab 4: Alerts (Inactive) -->
+  <button class="flex flex-col items-center justify-center text-on-surface-variant flex-1 transition-colors py-1">
+    <span class="material-symbols-outlined mb-1">notifications</span>
+    <span class="text-label-sm font-label-sm">Alerts</span>
+  </button>
+</nav>
+
+
+
+
+
+
+
+
+
+
+</body></html>

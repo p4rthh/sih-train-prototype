@@ -1,0 +1,394 @@
+<!DOCTYPE html><html class="light" lang="en" style="width: 390px; height: 1200px; overflow: hidden; position: relative;"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport">
+<title>Navarail - Train Itinerary</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&amp;display=swap" rel="stylesheet"><link class="" href="https://fonts.cdnfonts.com/css/samarkan" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#3f0018",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#6b6358",
+                        "on-tertiary-container": "#ecffe8",
+                        "on-primary-fixed-variant": "#8f0040",
+                        "on-primary-container": "#fff7f7",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-variant": "#f6dce0",
+                        "inverse-surface": "#3c2c2f",
+                        "surface-container-high": "#fce2e6",
+                        "primary-fixed-dim": "#ffb1c2",
+                        "surface-container": "#ffe8eb",
+                        "tertiary-fixed-dim": "#70dd82",
+                        "tertiary": "#006929",
+                        "on-error-container": "#93000a",
+                        "on-background": "#26181b",
+                        "error": "#ba1a1a",
+                        "tertiary-container": "#008536",
+                        "inverse-on-surface": "#ffecee",
+                        "surface-bright": "#fff8f7",
+                        "background": "#FDF1E3", /* Overridden per requirement */
+                        "outline-variant": "#e0bec4",
+                        "inverse-primary": "#ffb1c2",
+                        "primary": "#b10b52",
+                        "on-tertiary-fixed-variant": "#00531f",
+                        "secondary": "#655d53",
+                        "on-surface": "#26181b",
+                        "surface-dim": "#eed4d8",
+                        "secondary-fixed-dim": "#d0c5b8",
+                        "on-tertiary-fixed": "#002108",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "surface-tint": "#b71456",
+                        "surface-container-low": "#fff0f1",
+                        "secondary-fixed": "#ece1d3",
+                        "primary-container": "#d32f6a",
+                        "on-secondary": "#ffffff",
+                        "on-secondary-fixed-variant": "#4d463c",
+                        "on-surface-variant": "#594045",
+                        "tertiary-fixed": "#8dfa9b",
+                        "on-secondary-fixed": "#201b13",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#f6dce0",
+                        "secondary-container": "#ece1d3",
+                        "outline": "#8d7075",
+                        "primary-fixed": "#ffd9e0",
+                        "surface": "#ffffff" /* Cards */
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container-margin": "16px",
+                        "md": "16px",
+                        "sm": "8px",
+                        "gutter": "12px",
+                        "xs": "4px",
+                        "lg": "24px",
+                        "unit": "4px",
+                        "xl": "32px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "label-bold": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "700"}],
+                        "headline-lg": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                        "display-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                        "label-bold": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "headline-lg-mobile": ["22px", {"lineHeight": "28px", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Samarkan Font Fallback for Demo, using a styled serif or sans block if not available */
+        @font-face {
+            font-family: 'Samarkan';
+            src: local('Samarkan Normal'), local('Samarkan-Normal');
+            font-weight: normal;
+            font-style: normal;
+        }
+        .font-samarkan {
+            font-family: 'Samarkan', 'Inter', sans-serif; /* Fallback to Inter if Samarkan fails to load */
+        }
+        
+        .timeline-line {
+            position: absolute;
+            left: 28px;
+            top: 24px;
+            bottom: -24px;
+            width: 4px;
+            background-color: #e0bec4; /* outline-variant */
+            z-index: 0;
+        }
+        .timeline-line.passed {
+            background-color: #d32f6a; /* primary-container */
+        }
+        .timeline-last-item .timeline-line {
+            display: none;
+        }
+        
+        /* Pulse Animation */
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.8);
+                box-shadow: 0 0 0 0 rgba(211, 47, 106, 0.7);
+            }
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(211, 47, 106, 0);
+            }
+            100% {
+                transform: scale(0.8);
+                box-shadow: 0 0 0 0 rgba(211, 47, 106, 0);
+            }
+        }
+        .pulse-marker {
+            animation: pulse-ring 2s infinite;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface antialiased pt-20 selection:bg-primary-container selection:text-white pb-24" style="background-color: rgb(248, 203, 200);">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 px-4 flex items-center shadow-sm h-16 rounded-b-[2rem] border-b border-primary-container/20 justify-center" style="background-color: #FDEFDE;">
+<h1 class="text-headline-lg-mobile font-headline-lg-mobile font-black tracking-tight font-samarkan" style="font-family: Samarkan, sans-serif; font-size: 28px; line-height: 1.2; letter-spacing: -0.02em; font-weight: 800; color: rgb(230, 57, 110); font-style: normal; white-space: nowrap;">Navarail</h1>
+</header>
+<!-- Main Canvas -->
+<main class="px-container-margin pt-lg max-w-md mx-auto w-full flex flex-col gap-lg">
+<!-- Train Identity Header -->
+<section class="bg-surface rounded-xl shadow-[0_2px_12px_-4px_rgba(15,23,42,0.12)] p-md flex flex-col relative overflow-hidden" style="background-color: rgb(253, 239, 222); border-radius: 24px; box-shadow: rgba(230, 57, 110, 0.08) 0px 4px 20px -4px;">
+<!-- Arch Motif Overlay -->
+<div class="absolute top-0 left-0 right-0 h-16 bg-primary-container opacity-5 rounded-b-[50%] pointer-events-none"></div>
+<div class="flex items-center gap-sm mb-xs z-10">
+<span class="material-symbols-outlined text-primary-container" style="font-variation-settings: 'FILL' 1;">train</span>
+<span class="text-headline-md font-headline-md text-on-surface">12952</span>
+</div>
+<h2 class="text-body-lg font-body-lg font-bold text-on-surface-variant z-10">New Delhi Mumbai Rajdhani</h2>
+<div class="mt-md flex justify-between items-center pt-md border-t border-outline-variant/30">
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm text-secondary uppercase tracking-wide">Status</span>
+<span class="text-body-md font-body-md font-bold text-error flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">warning</span>
+                        Delayed
+                    </span>
+</div>
+<div class="flex flex-col text-right">
+<span class="text-label-sm font-label-sm text-secondary uppercase tracking-wide">Next Stop</span>
+<span class="text-body-md font-body-md font-bold text-on-surface">RTM (Ratlam)</span>
+</div>
+</div>
+</section>
+<!-- Vertical Itinerary -->
+<section class="flex flex-col w-full mb-xl"><div class="px-sm mb-md flex items-center justify-between bg-surface-container-low p-md rounded-xl border border-outline-variant/30 shadow-sm" style="background-color: rgb(253, 239, 222); border-radius: 20px; border-color: rgba(230, 57, 110, 0.15);">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full bg-primary-container/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary-container">my_location</span>
+</div>
+<div class="flex flex-col"><span class="text-body-md font-bold text-on-surface" style="font-family: Inter, sans-serif;">Track My Train</span><span class="text-label-sm text-on-surface-variant" style="font-family: Inter, sans-serif;">Live GPS Tracking</span></div>
+</div>
+<button class="relative inline-flex h-6 w-11 items-center rounded-full bg-primary transition-colors focus:outline-none" style="background-color: rgb(230, 57, 110);">
+<span class="inline-block h-4 w-4 translate-x-6 transform rounded-full bg-white transition-transform"></span>
+</button>
+</div>
+<div class="flex flex-col w-full relative pl-1">
+<!-- Timeline Track Left Anchor -->
+<div class="absolute left-[19px] top-6 bottom-8 w-[3px] bg-outline-variant/40 rounded-full z-0" style="background-color: rgb(196, 158, 165); width: 3.5px;"></div>
+<div class="absolute left-[19px] top-6 h-[270px] w-[3px] rounded-full z-0" style="background-color: rgb(158, 27, 70); height: 260px; width: 3.5px;"></div>
+<!-- 1. NDLS (Origin - Departed) -->
+<article class="relative flex items-start gap-3 pb-5 z-10">
+<div class="flex flex-col items-center pt-1">
+<div class="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm ring-4 ring-[#f8cbc8]" style="background-color: #e6396e;">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</div>
+</div>
+<div class="flex-1 bg-surface rounded-2xl p-3.5 shadow-sm border border-outline-variant/30" style="background-color: #FDEFDE;">
+<div class="flex justify-between items-start">
+<div>
+<div class="flex items-center gap-1.5 mb-0.5">
+<span class="text-headline-md font-bold text-on-surface leading-none">NDLS</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-container text-on-surface-variant">Origin</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold text-secondary bg-surface-container-high">PF 1</span>
+</div>
+<p class="text-body-md text-on-surface-variant font-medium">New Delhi</p>
+</div>
+<div class="text-right">
+<span class="text-body-md font-bold text-on-surface">16:55</span>
+<div class="flex items-center justify-end gap-1 mt-0.5">
+<span class="w-1.5 h-1.5 rounded-full" style="background-color: #008536;"></span>
+<span class="text-[11px] font-bold text-tertiary">Departed</span>
+</div>
+</div>
+</div>
+<div class="mt-2 pt-2 border-t border-outline-variant/20 flex items-center justify-between text-label-sm text-secondary">
+<span class="">0 km • Source</span>
+<span class="">Sched: 16:55 (On time)</span>
+</div>
+</div>
+</article>
+<!-- Inter-station Route Distance Indicator -->
+
+<!-- 2. KOTA (Passed) -->
+<article class="relative flex items-start gap-3 pb-5 z-10">
+<div class="flex flex-col items-center pt-1">
+<div class="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm ring-4 ring-[#f8cbc8]" style="background-color: #e6396e;">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</div>
+</div>
+<div class="flex-1 bg-surface rounded-2xl p-3.5 shadow-sm border border-outline-variant/30" style="background-color: #FDEFDE;">
+<div class="flex justify-between items-start">
+<div>
+<div class="flex items-center gap-1.5 mb-0.5">
+<span class="text-headline-md font-bold text-on-surface leading-none">KOTA</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold text-secondary bg-surface-container-high">PF 2</span>
+<span class="text-label-sm text-secondary font-medium">• 10m halt</span>
+</div>
+<p class="text-body-md text-on-surface-variant font-medium">Kota Junction</p>
+</div>
+<div class="text-right">
+<div class="flex items-center justify-end gap-1.5">
+<span class="text-label-sm text-secondary line-through">21:30</span>
+<span class="text-body-md font-bold text-on-surface">21:38</span>
+</div>
+<div class="flex items-center justify-end gap-1 mt-0.5">
+<span class="text-[11px] font-bold text-primary">Passed (+8m)</span>
+</div>
+</div>
+</div>
+<div class="mt-2 pt-2 border-t border-outline-variant/20 flex items-center justify-between text-label-sm text-secondary">
+<span class="">465 km traveled</span>
+<span class="">Dep: 21:48</span>
+</div>
+</div>
+</article>
+<!-- Live Section Speed & Proximity Strip -->
+<div class="relative flex items-center gap-3 py-2.5 my-1 z-10"><div class="w-9 flex items-center justify-center relative"><div class="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-md pulse-marker ring-4 ring-white z-10" style="background-color: #e6396e;"><span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">train</span></div></div><div class="flex-1 rounded-xl p-2.5 border shadow-xs flex flex-col gap-1.5" style="background-color: #FDEFDE; border-color: rgba(230, 57, 110, 0.3);"><div class="flex items-center justify-between"><div class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[15px] text-primary">speed</span><span class="text-[11px] font-bold text-on-surface">87 km/h</span><span class="text-[10px] text-secondary font-medium">• In Transit</span></div><div class="flex items-center gap-1 text-[11px] font-bold text-primary"><span class="material-symbols-outlined text-[14px]">near_me</span><span class="">34 km to Ratlam</span></div></div><div class="w-full flex flex-col gap-1"><div class="w-full bg-outline-variant/30 h-1.5 rounded-full overflow-hidden"><div class="h-full rounded-full transition-all" style="width: 87%; background-color: #e6396e;"></div></div><div class="flex justify-between items-center text-[10px] text-secondary"><span class="">232 km from Kota</span><span class="font-medium text-primary">87% of section covered</span></div></div></div></div>
+<!-- 3. RTM (Current / Approaching Station - Highlighted) -->
+<article class="relative flex items-start gap-3 pb-5 z-10">
+<div class="flex flex-col items-center pt-1">
+<div class="w-9 h-9 rounded-full flex items-center justify-center shadow-md ring-4 ring-white border-2 border-primary" style="background-color: rgb(253, 239, 222);"><span class="w-3.5 h-3.5 rounded-full bg-primary"></span></div>
+</div>
+<div class="flex-1 rounded-2xl p-4 shadow-md border-2 relative overflow-hidden" style="background-color: #FDEFDE; border-color: #e6396e;">
+<div class="flex justify-between items-start mb-2">
+<div>
+<div class="flex items-center gap-1.5 mb-1">
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider text-white" style="background-color: #e6396e;">NEXT STOP</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white text-on-surface shadow-xs">PF 4</span>
+<span class="text-[11px] font-semibold text-secondary">• 8m halt</span>
+</div>
+<h4 class="text-headline-md font-bold text-on-surface leading-tight">RTM</h4>
+<p class="text-body-md text-on-surface-variant font-medium">Ratlam Junction</p>
+</div>
+<div class="text-right bg-error/10 px-2.5 py-1.5 rounded-xl border border-error/25">
+<span class="text-[11px] text-secondary line-through block leading-none">Sch: 14:15</span>
+<span class="text-headline-md font-bold text-error block leading-tight mt-0.5">14:33</span>
+<span class="inline-block text-[10px] font-bold px-1.5 py-0.2 rounded bg-error text-white mt-0.5">18m Late</span>
+</div>
+</div>
+<!-- Live Context Badges -->
+<div class="mt-2.5 pt-2 border-t border-outline-variant/30 flex items-center justify-between">
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[11px] font-medium border border-primary-container/20 shadow-xs" style="background-color: rgba(230, 57, 110, 0.08);">
+<div class="flex items-center gap-1 text-error font-semibold">
+<span class="material-symbols-outlined text-[15px]">foggy</span>
+<span class="">Dense Fog</span>
+</div>
+<span class="text-outline-variant">|</span>
+<div class="flex items-center gap-1 text-on-surface-variant font-medium">
+<span class="material-symbols-outlined text-[15px] text-secondary">traffic</span>
+<span class="">Preceding Train</span>
+</div>
+</div>
+<div class="inline-flex items-center gap-1 text-[11px] font-semibold text-secondary pr-1">
+
+
+</div>
+</div>
+</div>
+</article>
+<!-- Inter-station Route Distance Indicator -->
+
+<!-- 4. BRC (Upcoming Station) -->
+<article class="relative flex items-start gap-3 pb-5 z-10">
+<div class="flex flex-col items-center pt-1">
+<div class="w-9 h-9 rounded-full bg-surface border-2 border-outline-variant text-secondary flex items-center justify-center shadow-xs" style="background-color: #FDEFDE;">
+<span class="w-2.5 h-2.5 rounded-full bg-outline"></span>
+</div>
+</div>
+<div class="flex-1 bg-surface rounded-2xl p-3.5 shadow-sm border border-outline-variant/30" style="background-color: #FDEFDE;">
+<div class="flex justify-between items-start">
+<div>
+<div class="flex items-center gap-1.5 mb-0.5">
+<span class="text-headline-md font-bold text-on-surface leading-none">BRC</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold text-secondary bg-surface-container-high">PF 2 (Est.)</span>
+<span class="text-label-sm text-secondary font-medium">• 6m halt</span>
+</div>
+<p class="text-body-md text-on-surface-variant font-medium">Vadodara Junction</p>
+</div>
+<div class="text-right">
+<span class="text-body-md font-bold text-on-surface">17:55</span>
+<span class="text-label-sm text-secondary block mt-0.5 font-medium">Scheduled</span>
+</div>
+</div>
+<div class="mt-2 pt-2 border-t border-outline-variant/20 flex items-center justify-between text-label-sm text-secondary">
+<span class="">989 km from start</span>
+<span class="">Day 1 • Platform 2</span>
+</div>
+</div>
+</article>
+<!-- Inter-station Route Distance Indicator -->
+
+<!-- 5. BCT (Terminus / Destination) -->
+<article class="relative flex items-start gap-3 pb-2 z-10">
+<div class="flex flex-col items-center pt-1">
+<div class="w-9 h-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center shadow-xs border border-outline-variant" style="background-color: #ece1d3;">
+<span class="material-symbols-outlined text-[18px]">flag</span>
+</div>
+</div>
+<div class="flex-1 bg-surface rounded-2xl p-3.5 shadow-sm border border-outline-variant/30" style="background-color: #FDEFDE;">
+<div class="flex justify-between items-start">
+<div>
+<div class="flex items-center gap-1.5 mb-0.5">
+<span class="text-headline-md font-bold text-on-surface leading-none">BCT</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-container text-on-surface-variant">Terminus</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold text-secondary bg-surface-container-high">PF 1</span>
+</div>
+<p class="text-body-md text-on-surface-variant font-medium">Mumbai Central</p>
+</div>
+<div class="text-right">
+<span class="text-body-md font-bold text-on-surface">23:35</span>
+<span class="text-label-sm text-secondary block mt-0.5 font-medium">Scheduled</span>
+</div>
+</div>
+<div class="mt-2 pt-2 border-t border-outline-variant/20 flex items-center justify-between text-label-sm text-secondary">
+<span class="">1,384 km Total Distance</span>
+<span class="">End of Journey</span>
+</div>
+</div>
+</article>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<button class="fixed bottom-20 right-4 z-50 bg-primary text-on-primary flex items-center gap-2 px-4 py-3 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-transform" style="background-color: rgb(230, 57, 110); color: rgb(255, 255, 255);">
+<span class="material-symbols-outlined">map</span>
+<span class="font-label-bold text-label-bold">Map View</span>
+</button><nav class="fixed bottom-0 left-0 right-0 z-50 py-2 flex justify-around items-center shadow-lg border-t pb-safe" style="background-color: rgb(253, 239, 222); border-color: rgba(230, 57, 110, 0.25); box-shadow: rgba(15, 23, 42, 0.06) 0px -4px 16px -4px;"><button class="flex flex-col items-center justify-center gap-1 text-on-surface-variant hover:opacity-80 transition-opacity"><span class="material-symbols-outlined text-[22px]">directions_railway</span><span class="text-[11px] font-medium leading-none">Train View</span></button><button class="flex flex-col items-center justify-center gap-1"><div class="w-12 h-7 rounded-full flex items-center justify-center shadow-sm" style="background-color: rgb(230, 57, 110);"><span class="material-symbols-outlined text-white text-[18px]" style="font-variation-settings: 'FILL' 1;">location_on</span></div><span class="text-[11px] font-bold leading-none" style="color: rgb(230, 57, 110);">Track</span></button><button class="flex flex-col items-center justify-center gap-1 text-on-surface-variant hover:opacity-80 transition-opacity"><span class="material-symbols-outlined text-[22px]">bar_chart</span><span class="text-[11px] font-medium leading-none">Behavior</span></button><button class="flex flex-col items-center justify-center gap-1 text-on-surface-variant hover:opacity-80 transition-opacity relative"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-0 right-2 w-2 h-2 rounded-full" style="background-color: rgb(230, 57, 110);"></span><span class="text-[11px] font-medium leading-none">Alerts</span></button></nav>
+<!-- Support for safe area padding on iOS -->
+<style>
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+
+
+
+
+
+
+
+
+
+
+</body></html>

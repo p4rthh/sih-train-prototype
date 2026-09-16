@@ -1,0 +1,298 @@
+<!DOCTYPE html><html lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>Navarail - Train Overview</title>
+<!-- Tailwind CSS v3 with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Poppins & Montserrat for high-legibility UI styling -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700&amp;family=Nunito:wght@400;600;700;800;900&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet" class=""><link href="https://fonts.cdnfonts.com/css/samarkan" rel="stylesheet" class="">
+<!-- Tailwind Configuration -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              bg: '#F5C8C8',            /* Rosy peach background matching snapshot outer tint */
+              page: '#FDEFDE',          /* Warm sand/cream background tone */
+              primary: '#E6396E',       /* Deep vibrant magenta / signature pink */
+              primaryDark: '#D32860',   /* Dark magenta for borders/pressed states */
+              accentRed: '#C51616',     /* Pill badge delay red */
+              cardBg: '#FFF9F5',        /* Off-white soft cream card container */
+              subCard: '#F7D6D6',       /* Soft pink inner stats pill background */
+              textPink: '#DC3167',      /* Vibrant typography color */
+              subText: '#9A586C'        /* Soft muted pinkish grey text */
+            }
+          },
+          fontFamily: {
+            sans: ['Montserrat', 'Nunito', 'sans-serif'],
+            display: ['"Samarkan"', 'Montserrat', 'sans-serif']
+          },
+          borderRadius: {
+            '2xl': '1.25rem',
+            '3xl': '1.75rem',
+            '4xl': '2.25rem'
+          },
+          boxShadow: {
+            'soft': '0 3px 12px rgba(220, 49, 103, 0.08)',
+            'pill': '0 2px 6px rgba(197, 22, 22, 0.25)'
+          }
+        }
+      }
+    }
+  </script>
+<!-- Custom Styles: Typography, Shirorekha Head-line effect & Components -->
+<style data-purpose="custom-typography">
+    /* Authentic Indian script inspired top shirorekha head-line for "navarail" */
+    .brand-logo-text {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      position: relative;
+      display: inline-block;
+      text-transform: lowercase;
+    }
+    .brand-logo-text::before {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background-color: #E6396E;
+      border-radius: 2px;
+    }
+    .brand-logo-text span.rail-curl {
+      position: relative;
+      display: inline-block;
+    }
+    .brand-logo-text span.rail-curl::after {
+      content: '̀';
+      position: absolute;
+      right: -2px;
+      top: -12px;
+      font-size: 26px;
+      color: #E6396E;
+    }
+  </style>
+<style data-purpose="custom-slider-and-layout">
+    /* Progress slider track styling */
+    .slider-track {
+      position: relative;
+      height: 6px;
+      background: #E8B4B4;
+      border-radius: 9999px;
+      overflow: visible;
+    }
+    .slider-filled {
+      position: absolute;
+      top: 0;
+      left: 12%;
+      right: 5%;
+      height: 100%;
+      background: #E6396E;
+      border-radius: 9999px;
+    }
+    .slider-thumb {
+      position: absolute;
+      top: 50%;
+      left: 52%;
+      transform: translate(-50%, -50%);
+      width: 15px;
+      height: 15px;
+      background: #E6396E;
+      border-radius: 50%;
+      box-shadow: 0 0 0 3px rgba(230, 57, 110, 0.25);
+    }
+  </style>
+</head>
+<body class="bg-[#F8CBC8] flex justify-center items-start min-h-screen p-0 sm:p-4 text-gray-800 font-sans antialiased selection:bg-brand-primary selection:text-white">
+<!-- BEGIN: MobileDeviceFrame -->
+<main class="w-full max-w-[420px] bg-[#F8CBC8] shadow-2xl rounded-none sm:rounded-[36px] overflow-hidden flex flex-col min-h-screen border-0 sm:border-[5px] sm:border-[#EEC0C0]" data-purpose="mobile-screen-container">
+<!-- BEGIN: TopBar -->
+<header class="bg-[#FDEFDE] h-16 px-4 flex items-center justify-between border-b border-[#F7DCD2] rounded-b-[28px]" data-purpose="app-top-header">
+<!-- Back Chevron Button -->
+<button aria-label="Go Back" class="w-9 h-9 flex items-center justify-center rounded-full text-brand-primary active:scale-95 transition-transform" type="button">
+<svg class="w-7 h-7 text-brand-primary" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<circle cx="12" cy="12" fill="none" r="9" stroke="currentColor" stroke-width="2"></circle>
+<path d="M13.5 8.5L9.5 12l4 3.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Center Logo (navarail) -->
+<div class="flex items-center justify-center" data-purpose="brand-logo"><span class="text-[28px] text-brand-primary tracking-normal lowercase leading-none" style="font-family: Samarkan, &quot;Samarkan Normal&quot;, sans-serif; font-style: normal; font-weight: 800; letter-spacing: -0.02em;">navarail</span></div><div class="w-9 h-9" aria-hidden="true"></div>
+<!-- Hamburger Menu Icon -->
+
+</header>
+<!-- END: TopBar -->
+<!-- BEGIN: TabNavigation -->
+
+<!-- END: TabNavigation -->
+<!-- Scrollable Screen Content Container -->
+<div class="flex-1 overflow-y-auto px-4 pt-3 pb-6 space-y-3.5 bg-[#F8CBC8]">
+<!-- BEGIN: SearchBar -->
+
+<!-- END: SearchBar -->
+<!-- BEGIN: TrainHeaderAndStatsCard -->
+<section class="rounded-3xl p-4 shadow-sm border border-[#FBE6E3] bg-[#FDEFDE]" data-purpose="train-header-speed-card">
+<!-- Top meta badge row -->
+<div class="flex items-center justify-between mb-1.5">
+<h2 class="text-sm tracking-wider font-extrabold text-brand-primary uppercase">
+            TRAIN #12952
+          </h2>
+<!-- Delay Pill Badge -->
+<div class="flex items-center gap-1.5 bg-brand-accentRed text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-pill">
+<span class="w-2.5 h-2.5 bg-white rounded-full inline-block animate-pulse"></span>
+<span class="">Delayed by 10m</span>
+</div>
+</div>
+<!-- Train Title -->
+<h1 class="text-2xl font-black text-brand-primary tracking-tight mb-3">
+          MMCT TEJAS RAJ
+        </h1>
+<!-- 3-Column Stats Sub-card -->
+<div class="bg-[#F8CBC8] rounded-2xl p-2.5 grid grid-cols-3 divide-x divide-[#EBB0B0] text-center" data-purpose="train-quick-stats">
+<!-- Column 1: Current Stop -->
+<div class="px-1 flex flex-col justify-center">
+<p class="text-[9.5px] font-extrabold text-brand-subText uppercase tracking-wider">CURRENT STOP</p>
+<p class="text-sm font-black text-brand-primary mt-0.5 leading-tight">KOTA JN</p>
+<p class="text-[10px] font-bold text-brand-subText uppercase">KOTA</p>
+</div>
+<!-- Column 2: Next Stop -->
+<div class="px-1 flex flex-col justify-center">
+<p class="text-[9.5px] font-extrabold text-brand-subText uppercase tracking-wider">NEXT STOP</p>
+<p class="text-sm font-black text-brand-primary mt-0.5 leading-tight">NAGDA JN</p>
+<p class="text-[10px] font-bold text-brand-subText uppercase">NAD</p>
+</div>
+<!-- Column 3: Live Speed -->
+<div class="px-1 flex flex-col justify-center">
+<p class="text-[9.5px] font-extrabold text-brand-subText uppercase tracking-wider">LIVE SPEED</p>
+<p class="text-xl font-black text-brand-primary mt-0.5 leading-none">87</p>
+<p class="text-[10px] font-bold text-brand-subText">km/hr</p>
+</div>
+</div>
+</section>
+<!-- END: TrainHeaderAndStatsCard -->
+<!-- BEGIN: ArrivalWindowCard -->
+<section class="rounded-3xl p-4 shadow-sm border border-[#FBE6E3] bg-[#FDEFDE]" data-purpose="arrival-window-details-card"><!-- Header Row -->
+<div class="flex items-center justify-between mb-2">
+  <div class="flex items-center gap-1.5">
+    <svg class="w-4 h-4 text-brand-primary" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"></circle>
+      <polyline points="12 7 12 12 15 15"></polyline>
+    </svg>
+    <h3 class="text-xs tracking-wider font-extrabold text-brand-primary uppercase">
+      ARRIVAL WINDOW
+    </h3>
+  </div>
+  <span class="text-[11px] font-bold text-brand-subText bg-[#F8CBC8]/60 px-2.5 py-0.5 rounded-full border border-[#F1B5B5]/60">
+    Platform 1
+  </span>
+</div>
+
+<!-- Hero Window & Confidence Display -->
+<div class="flex justify-between gap-2 items-center">
+  <span class="text-3xl font-black text-brand-primary tracking-tight leading-none">
+    01:44 <span class="text-brand-primary/60 font-semibold">–</span> 01:50
+  </span>
+  <span class="inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-700 bg-emerald-100/80 px-2.5 py-1 rounded-full border border-emerald-300 shadow-sm">
+    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+    90% Confidence
+  </span>
+</div>
+
+<!-- Modern Visual Timeline Slider -->
+<div class="mt-4 mb-3.5 px-0.5">
+  <div class="relative flex items-center h-3">
+    <!-- Outer Full Track (Earliest 01:41 to Latest 01:54) -->
+    <div class="w-full h-2 bg-[#F5C8C8] rounded-full relative overflow-hidden">
+      <!-- Active Window Highlight (01:44 to 01:50) -->
+      <div class="absolute left-[23%] right-[30%] h-full bg-brand-primary rounded-full opacity-90"></div>
+    </div>
+    <!-- Most Probable Marker Point (01:46) -->
+    <div class="absolute left-[45%] -translate-x-1/2 flex items-center justify-center">
+      <span class="relative flex h-4 w-4 items-center justify-center">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-primary opacity-40"></span>
+        <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-brand-primary border-2 border-[#FDEFDE] shadow-sm"></span>
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Milestone Pills (3-column grid) -->
+<div class="grid grid-cols-3 gap-1.5 bg-[#F8CBC8]/50 p-1.5 rounded-2xl border border-[#F1B5B5]/70 text-center mb-3.5">
+  <div class="py-1.5 px-1 flex flex-col justify-center rounded-xl">
+    <p class="text-[9px] uppercase font-bold text-brand-subText tracking-wide">Earliest</p>
+    <p class="text-xs font-black text-gray-800 mt-0.5">01:41</p>
+  </div>
+  <div class="py-1.5 px-1 flex flex-col justify-center rounded-xl bg-[#FDEFDE] shadow-sm border border-brand-primary/25">
+    <p class="text-[9px] uppercase font-black text-brand-primary tracking-wide">Most Probable</p>
+    <p class="text-sm font-black text-brand-primary mt-0.5">01:46</p>
+  </div>
+  <div class="py-1.5 px-1 flex flex-col justify-center rounded-xl">
+    <p class="text-[9px] uppercase font-bold text-brand-subText tracking-wide">Latest</p>
+    <p class="text-xs font-black text-gray-800 mt-0.5">01:54</p>
+  </div>
+</div>
+
+<!-- Divider Line -->
+<hr class="border-t border-[#F1B5B5]/80 my-3">
+
+<!-- Summary Status Callout -->
+<div class="flex items-center justify-between bg-white/40 rounded-xl px-3 py-2 border border-[#F7DCD2]">
+  <div class="flex items-center gap-1 text-xs text-brand-primary font-bold">
+    <span class="">Most Probable:</span>
+    <span class="font-black text-sm text-brand-primary">01:46</span>
+  </div>
+  <span class="bg-brand-accentRed text-white text-[10.5px] font-black px-2.5 py-0.5 rounded-full shadow-pill inline-flex items-center gap-1">
+    <span class="">+24m delay expected</span>
+  </span>
+</div>
+
+<!-- Conformal Prediction Subtitle -->
+</section>
+<!-- END: ArrivalWindowCard -->
+<!-- BEGIN: DelayReasonCard -->
+<section class="rounded-3xl p-3.5 shadow-sm border border-[#FBE6E3] bg-[#FDEFDE]" data-purpose="delay-reason-breakdown-card">
+<!-- Card Pill Header Header -->
+<div class="bg-[#F8CBC8] rounded-2xl py-2 px-3.5 inline-block w-full border border-[#F1B5B5]">
+<h4 class="text-xs font-black text-brand-primary tracking-wide uppercase text-center sm:text-left">
+            WHY IS THIS TRAIN DELAYED?
+          </h4>
+</div>
+<!-- Explanation Points -->
+<div class="mt-3 space-y-2.5 px-1 pb-1">
+<!-- Point 1 -->
+<div class="flex items-start gap-2.5 text-xs text-gray-700 leading-snug">
+
+<div>
+<p class="font-bold text-gray-800">Dense Fog in Gangapur City Section</p>
+<p class="text-[11px] text-gray-500 font-medium">Automatic signal cautious speed restriction: 60 km/h enforced.</p>
+</div>
+</div><hr class="border-t border-[#F1B5B5] my-2.5">
+<!-- Point 2 -->
+<div class="flex items-start gap-2.5 text-xs text-gray-700 leading-snug">
+
+<div>
+<p class="font-bold text-gray-800">Preceding Train #12904 Delay</p>
+<p class="text-[11px] text-gray-500 font-medium">Delayed by 18 mins ahead. Waiting for track block clearance into Kota.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- END: DelayReasonCard -->
+</div>
+<!-- END: Scrollable Content -->
+<!-- BEGIN: BottomNavigation -->
+<nav class="bg-[#FDEFDE] border-t border-[rgba(230,57,110,0.2)] px-2 py-2 flex items-center justify-between shadow-lg" data-purpose="bottom-tab-navigation"><button class="flex-1 flex flex-col items-center justify-center gap-0.5" data-purpose="nav-item-train-view"><div class="w-12 h-7 rounded-full flex items-center justify-center shadow-sm" style="background-color: rgb(230, 57, 110);"><span class="material-symbols-outlined text-white text-[18px]" style="font-variation-settings: 'FILL' 1;">train</span></div><span class="text-[10px] font-bold leading-none" style="color: rgb(230, 57, 110);">Train View</span></button><button class="flex-1 flex flex-col items-center justify-center gap-1 py-1 transition-opacity hover:opacity-80" style="color: #7C6067;" data-purpose="nav-item-track"><span class="material-symbols-outlined text-[20px] mb-0.5" style="font-variation-settings: 'FILL' 0;">location_on</span><span class="text-[10px] font-medium leading-none">Track</span></button><button class="flex-1 flex flex-col items-center justify-center gap-1 py-1 transition-opacity hover:opacity-80" style="color: #7C6067;" data-purpose="nav-item-behavior"><span class="material-symbols-outlined text-[20px] mb-0.5" style="font-variation-settings: 'FILL' 0;">bar_chart</span><span class="text-[10px] font-medium leading-none">Behavior</span></button><button class="flex-1 flex flex-col items-center justify-center gap-1 py-1 transition-opacity hover:opacity-80 relative" style="color: #7C6067;" data-purpose="nav-item-alerts"><span class="material-symbols-outlined text-[20px] mb-0.5" style="font-variation-settings: 'FILL' 0;">notifications</span><span class="text-[10px] font-medium leading-none">Alerts</span></button></nav>
+<!-- END: BottomNavigation -->
+</main>
+<!-- END: MobileDeviceFrame -->
+
+
+
+
+
+
+</body></html>

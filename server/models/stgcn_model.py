@@ -19,7 +19,7 @@ class SpatialGraphConv(nn.Module):
         nn.init.zeros_(self.bias)
 
     def forward(self, x: torch.Tensor, laplacian: torch.Tensor) -> torch.Tensor:
-        # x: (B, N, F, T) -> transpose for matrix multiply
+        # x: (B, N, F_in, T)
         B, N, F_in, T = x.shape
         x_perm = x.permute(0, 3, 1, 2) # (B, T, N, F_in)
         h = torch.matmul(x_perm, self.weight) # (B, T, N, F_out)
@@ -40,7 +40,7 @@ class TemporalGatedConv(nn.Module):
         return p * q
 
 class STGCNBlock(nn.Module):
-    def __init__(self, in_channels: int, spatial_channels: int, out_channels: int, num_nodes: int):
+    def __init__(self, in_channels: int, spatial_channels: int, out_channels: int):
         super(STGCNBlock, self).__init__()
         self.tconv1 = TemporalGatedConv(in_channels, spatial_channels, kernel_size=2)
         self.sconv = SpatialGraphConv(spatial_channels, spatial_channels)
@@ -49,7 +49,6 @@ class STGCNBlock(nn.Module):
 
     def forward(self, x: torch.Tensor, laplacian: torch.Tensor) -> torch.Tensor:
         # x: (B, N, F, T)
-        B, N, F_in, T = x.shape
         h = x.permute(0, 2, 1, 3) # (B, F, N, T)
         h = self.tconv1(h)        # (B, F_sp, N, T-1)
         h = h.permute(0, 2, 1, 3) # (B, N, F_sp, T-1)
@@ -60,29 +59,35 @@ class STGCNBlock(nn.Module):
         return h.permute(0, 2, 1, 3) # (B, N, F_out, T-2)
 
 class RailwaySTGCN(nn.Module):
-    def __init__(self, in_features: int = 4, hidden_dim: int = 32, num_timesteps: int = 4):
+    """
+    Spatio-temporal graph convolutional network for railway corridor delay propagation.
+    Accepts arbitrary corridor length N nodes across T timesteps with 8 station features.
+    """
+    def __init__(self, in_features: int = 8, hidden_dim: int = 32, num_timesteps: int = 6):
         super(RailwaySTGCN, self).__init__()
         self.in_features = in_features
         self.hidden_dim = hidden_dim
         self.num_timesteps = num_timesteps
 
-        self.block1 = nn.Sequential()
-        self.sconv = SpatialGraphConv(in_features, hidden_dim)
-        self.tconv = nn.Conv1d(hidden_dim * num_timesteps, hidden_dim, kernel_size=1)
+        self.block1 = STGCNBlock(in_features, hidden_dim, hidden_dim)
+        self.block2 = STGCNBlock(hidden_dim, hidden_dim, hidden_dim * 2)
+
         self.readout = nn.Sequential(
-            nn.Linear(hidden_dim, 16),
+            nn.Linear(hidden_dim * 2, 32),
             nn.ReLU(),
-            nn.Linear(16, 1)
+            nn.Dropout(0.15),
+            nn.Linear(32, 1)
         )
 
     def forward(self, x: torch.Tensor, laplacian: torch.Tensor) -> torch.Tensor:
-        # x: (B, N, F, T)
-        B, N, F_in, T = x.shape
-        h = self.sconv(x, laplacian) # (B, N, hidden_dim, T)
-        h = h.reshape(B * N, self.hidden_dim * T, 1) # (B*N, hidden_dim*T, 1)
-        h = F.relu(self.tconv(h)).squeeze(-1) # (B*N, hidden_dim)
-        out = self.readout(h) # (B*N, 1)
-        return out.reshape(B, N)
+        # x: (B, N, F=8, T=6)
+        h = self.block1(x, laplacian) # (B, N, hidden_dim, T=4)
+        h = self.block2(h, laplacian) # (B, N, hidden_dim*2, T=2)
+
+        # Average pool over remaining temporal steps
+        h = h.mean(dim=-1) # (B, N, hidden_dim*2)
+        out = self.readout(h).squeeze(-1) # (B, N)
+        return out
 
 def compute_normalized_laplacian(adj: np.ndarray) -> torch.Tensor:
     n = adj.shape[0]
@@ -101,19 +106,26 @@ def build_route_adjacency(route_stops: List[Dict[str, Any]]) -> np.ndarray:
     for i in range(len(route_stops)):
         adj[i, i] = 1.0
         if i + 1 < len(route_stops):
-            d = float(route_stops[i+1].get("section_km") or 15.0)
+            d = float(route_stops[i + 1].get("section_km") or 15.0)
             w = math.exp(-d / 100.0)
-            adj[i, i+1] = w
-            adj[i+1, i] = w
+            adj[i, i + 1] = w
+            adj[i + 1, i] = w
 
     return adj
 
 class DelaySTGCN:
     def __init__(self):
-        self.model = RailwaySTGCN(in_features=4, hidden_dim=32, num_timesteps=4)
+        self.model = RailwaySTGCN(in_features=8, hidden_dim=32, num_timesteps=6)
         self.is_fitted = False
 
-    def predict(self, route_stops: List[Dict[str, Any]], current_stop_idx: int, delay_history: List[float], weather: Dict[str, Any]) -> float:
+    def predict(
+        self,
+        route_stops: List[Dict[str, Any]],
+        current_stop_idx: int,
+        delay_history: List[float],
+        weather: Dict[str, Any],
+        priority_rank: int = 2
+    ) -> float:
         if not self.is_fitted:
             self.load()
 
@@ -124,33 +136,41 @@ class DelaySTGCN:
         adj = build_route_adjacency(route_stops)
         lap = compute_normalized_laplacian(adj)
 
-        T = 4
+        T = 6
         curr_delay = float(delay_history[-1]) if delay_history else 0.0
-        vis = float(weather.get("visibility_m", 10000.0))
         fog_idx = float(weather.get("fog_severity_index", 0.0))
         precip = float(weather.get("precipitation_mm", 0.0))
 
-        # Node features across T timesteps: (N, 4, T)
-        x_data = np.zeros((1, n, 4, T), dtype=np.float32)
+        # Node features across T=6 timesteps: (1, N, 8, T)
+        x_data = np.zeros((1, n, 8, T), dtype=np.float32)
         for i in range(n):
             node_rel = max(0, i - current_stop_idx)
-            decay = math.exp(-node_rel * 0.25)
+            decay = math.exp(-node_rel * 0.20)
             node_delay = curr_delay * decay
+
+            stop = route_stops[i]
+            sec_dist = float(stop.get("section_km", 15.0))
+            slack = float(stop.get("section_slack", 3.0))
 
             for t in range(T):
                 t_lag = (T - 1 - t)
-                lag_val = max(0.0, node_delay - (t_lag * 1.5))
+                lag_val = max(0.0, node_delay - (t_lag * 1.2))
+
                 x_data[0, i, 0, t] = lag_val / 60.0
-                x_data[0, i, 1, t] = fog_idx
-                x_data[0, i, 2, t] = min(1.0, precip / 20.0)
-                x_data[0, i, 3, t] = 1.0 if i == current_stop_idx else 0.5
+                x_data[0, i, 1, t] = (node_delay - lag_val) / 10.0
+                x_data[0, i, 2, t] = fog_idx
+                x_data[0, i, 3, t] = min(1.0, precip / 25.0)
+                x_data[0, i, 4, t] = min(1.0, sec_dist / 200.0)
+                x_data[0, i, 5, t] = min(1.0, slack / 30.0)
+                x_data[0, i, 6, t] = 1.0 if i == current_stop_idx else (0.75 if i < current_stop_idx else 0.25)
+                x_data[0, i, 7, t] = min(1.0, priority_rank / 6.0)
 
         self.model.eval()
         with torch.no_grad():
             inp = torch.tensor(x_data, dtype=torch.float32)
             out = self.model(inp, lap) # (1, N)
             target_idx = min(current_stop_idx + 1, n - 1)
-            delta = float(out[0, target_idx].item()) * 10.0
+            delta = float(out[0, target_idx].item()) * 6.0
 
         return round(float(delta), 2)
 

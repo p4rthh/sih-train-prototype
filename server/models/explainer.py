@@ -24,7 +24,7 @@ class DelayReasonEngine:
                 "shap_impact": float(s)
             })
 
-        positive_drivers = [item for item in impacts if item["shap_impact"] > 0.3]
+        positive_drivers = [item for item in impacts if item["shap_impact"] > 0.25]
         positive_drivers.sort(key=lambda x: x["shap_impact"], reverse=True)
 
         reasons = []
@@ -55,28 +55,37 @@ class DelayReasonEngine:
             return f"Foggy Conditions ({int(value)}m) — Caution speed limit in effect (60 km/h)", severity
         elif feature == "precipitation_mm" and value > 15.0:
             return f"Heavy Rainfall ({value:.1f} mm/h) — Track waterlogging caution order", severity
-        elif feature == "upstream_train_delay" and value > 20.0:
+        elif feature == "upstream_train_delay" and value > 15.0:
             return f"Preceding train ahead is delayed by {int(value)}m — Block clearance wait", severity
         elif feature == "track_capacity" and int(value) == 1:
             return "Single-Track Section — Waiting on loop line for crossing train to clear", severity
-        elif feature == "train_priority" and value >= 5:
-            return "Precedence Control — Held on loop to let express service overtake", severity
+        elif feature == "train_priority" and value >= 4:
+            return "Precedence Control — Held on loop to let premier service overtake", severity
         elif feature == "is_loco_reversal" and int(value) == 1:
             return "Locomotive Reversal / Engine Swap — Shunting & brake pipe testing in progress", severity
         elif feature == "sched_dwell_min" and value >= 15.0:
             return f"Scheduled Major Technical Halt ({int(value)} min) — Crew change & watering", "LOW"
-        elif feature == "delay_delta" and value > 5.0:
+        elif feature == "delay_delta" and value > 4.0:
             return f"Compounding delay trend — Lost {int(value)} mins in previous block section", severity
-        elif feature == "temperature_c" and value > 44.0:
-            return f"Extreme Ambient Temperature ({value:.1f}°C) — Rail thermal expansion caution", severity
-        elif feature == "fog_severity_index" and value > 0.7:
-            return "Dense corridor-wide fog — Systematic speed restriction active", "HIGH"
-
+        elif feature == "delay_acceleration" and value > 2.0:
+            return "Accelerating delay rate — Congestion compounding downstream", severity
+        elif feature == "is_junction_station" and int(value) == 1:
+            return "Approaching major railway junction — Route setting and signaling clearance", severity
+        elif feature == "temperature_c" and value > 43.0:
+            return f"Extreme Ambient Temperature ({value:.1f}C) — Rail thermal expansion caution", severity
+        elif feature == "fog_severity_index" and value > 0.6:
+            return "Corridor-wide fog — Systematic speed restriction active", "HIGH"
+        elif feature == "is_monsoon_season" and int(value) == 1:
+            return "Monsoon caution order — Wet rail adhesion braking limits", severity
+        elif feature == "is_holiday_or_festival" and int(value) == 1:
+            return "Peak travel volume — Increased platform dwell & passenger boarding time", severity
         elif feature == "is_overnight_recovery_window" and int(value) == 1:
-            return "Overnight Speedup — Low traffic & green signals (23:00–05:30) enabling MPS catch-up", "LOW"
-        elif feature == "recovery_slack_min" and value >= 5.0:
+            return "Overnight Speedup — Low traffic & green signals (22:30–05:30) enabling MPS catch-up", "LOW"
+        elif feature in ["recovery_slack_min", "section_slack_min"] and value >= 4.0:
             return f"Scheduled Slack Buffer ({int(value)} min) — Absorbing intermediate delay into timetable margin", "LOW"
-        elif feature == "hist_recovery_rate" and value >= 0.8:
+        elif feature == "is_terminal_approach" and int(value) == 1:
+            return "Terminal Approach — Final corridor buffer absorbing residual delay before arrival", "LOW"
+        elif feature == "hist_recovery_rate" and value >= 0.75:
             return f"High Historical Catch-Up ({int(value * 100)}%) — Train historically recovers delay before destination", "LOW"
 
         return "", "LOW"

@@ -1,0 +1,230 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>Navarail - Alerts</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&amp;display=swap" rel="stylesheet"><link href="https://fonts.cdnfonts.com/css/samarkan" rel="stylesheet" class="">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#d32f6a",
+                        "on-background": "#26181b",
+                        "outline": "#8d7075",
+                        "tertiary-container": "#008536",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-container": "#ecffe8",
+                        "on-tertiary-fixed": "#002108",
+                        "on-secondary-fixed-variant": "#4d463c",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary": "#655d53",
+                        "surface-container": "#ffe8eb",
+                        "on-surface": "#26181b",
+                        "tertiary-fixed": "#8dfa9b",
+                        "surface-bright": "#fff8f7",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#006929",
+                        "primary-fixed-dim": "#ffb1c2",
+                        "surface-variant": "#f6dce0",
+                        "on-primary-fixed-variant": "#8f0040",
+                        "surface-container-high": "#fce2e6",
+                        "surface-tint": "#b71456",
+                        "secondary-container": "#ece1d3",
+                        "background": "#fff8f7",
+                        "inverse-primary": "#ffb1c2",
+                        "surface-container-highest": "#f6dce0",
+                        "on-primary-fixed": "#3f0018",
+                        "primary-fixed": "#ffd9e0",
+                        "secondary-fixed-dim": "#d0c5b8",
+                        "error-container": "#ffdad6",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-low": "#fff0f1",
+                        "primary": "#b10b52",
+                        "secondary-fixed": "#ece1d3",
+                        "surface-dim": "#eed4d8",
+                        "inverse-on-surface": "#ffecee",
+                        "on-secondary-container": "#6b6358",
+                        "on-secondary": "#ffffff",
+                        "on-surface-variant": "#594045",
+                        "inverse-surface": "#3c2c2f",
+                        "outline-variant": "#e0bec4",
+                        "error": "#ba1a1a",
+                        "on-error": "#ffffff",
+                        "surface": "#fff8f7",
+                        "tertiary-fixed-dim": "#70dd82",
+                        "on-secondary-fixed": "#201b13",
+                        "on-primary-container": "#fff7f7",
+                        "on-tertiary-fixed-variant": "#00531f"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "16px",
+                        "container-margin": "16px",
+                        "gutter": "12px",
+                        "xs": "4px",
+                        "lg": "24px",
+                        "unit": "4px",
+                        "sm": "8px",
+                        "xl": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Inter"],
+                        "label-bold": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["22px", { "lineHeight": "28px", "fontWeight": "700" }],
+                        "label-bold": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .arch-clip {
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 24px), 50% 100%, 0 calc(100% - 24px));
+        }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md antialiased min-h-screen flex flex-col pb-safe bg-background" style="background-color: rgb(248, 203, 200);">
+<!-- TopAppBar (Web & Mobile Hybrid Setup) -->
+<header class="fixed top-0 left-0 w-full z-50 px-4 flex items-center shadow-md justify-center h-16 rounded-b-[2rem]" style="background-color: rgb(253, 239, 222); border-bottom: 1px solid rgba(230, 57, 110, 0.15);"><h1 class="text-headline-lg-mobile font-headline-lg-mobile font-black text-primary font-samarkan" style="font-family: Samarkan, sans-serif; letter-spacing: -0.02em; font-weight: 800; font-style: normal; color: rgb(230, 57, 110); font-size: 28px; white-space: nowrap;">Navarail</h1></header>
+<!-- Mobile Header -->
+<!-- Main Content Canvas -->
+<main class="flex-grow pb-24 px-container-margin flex flex-col gap-lg md:max-w-2xl md:mx-auto w-full pt-20">
+<!-- Page Header & Context -->
+<div class="flex flex-col gap-xs mb-md">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-surface" style="letter-spacing: -0.01em;">Live Alerts</h2>
+<div class="flex items-center gap-sm bg-surface-container-high rounded-full px-sm py-xs w-max" style="background-color: rgb(248, 203, 200);">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="train">train</span>
+<span class="font-label-bold text-label-bold text-on-surface">Train 12952 - New Delhi Mumbai Rajdhani</span>
+</div>
+<div class="flex items-center justify-between bg-surface-container-high rounded-xl p-md shadow-sm" style="background-color: rgb(253, 239, 222); border: 1px solid rgba(230, 57, 110, 0.2);">
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Tracking Status</span>
+<span class="text-headline-md font-headline-md text-on-surface">Track My Train</span>
+</div>
+<div class="bg-tertiary-container/10 text-tertiary-container px-sm py-xs rounded-full flex items-center gap-xs" style="background-color: rgb(236, 255, 232); color: rgb(0, 105, 41);">
+<span class="w-2 h-2 rounded-full bg-tertiary-container animate-pulse" style="background-color: rgb(0, 105, 41);"></span>
+<span class="text-label-bold font-label-bold uppercase">Active</span>
+</div>
+</div></div>
+<!-- Alerts List (Bento-style layout for web, stacked for mobile) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md w-full">
+<!-- Alert Card: Arrival Alert (Primary Theme) -->
+<div class="glass-card rounded-xl p-md shadow-sm border-l-4 border-l-primary flex gap-md md:col-span-2 relative overflow-hidden transition-transform active:scale-[0.98]" style="border-width: 1px 1px 1px 4px; border-style: solid; border-color: rgb(248, 203, 200) rgb(248, 203, 200) rgb(248, 203, 200) rgb(230, 57, 110); border-image: none; background-color: rgb(253, 239, 222);">
+
+<div class="flex flex-col items-center justify-start pt-1">
+<div class="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center text-primary-container" style="background-color: rgb(248, 203, 200); color: rgb(230, 57, 110);">
+<span class="material-symbols-outlined" data-icon="location_on" style="font-variation-settings: &quot;FILL&quot; 1;">location_on</span>
+</div>
+</div>
+<div class="flex flex-col gap-xs flex-grow">
+<div class="flex justify-between items-start w-full">
+<h3 class="font-headline-md text-headline-md text-primary-container" style="color: rgb(230, 57, 110);">Arriving Soon</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Just now</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface">You are 5 minutes away from your destination, Mumbai Central.</p>
+</div>
+</div>
+<!-- Alert Card: On Time (Green Theme) -->
+<div class="glass-card rounded-xl p-md shadow-sm border-l-4 flex gap-md transition-transform active:scale-[0.98] border-l-primary" style="border-width: 1px 1px 1px 4px; border-style: solid; border-color: rgb(248, 203, 200) rgb(248, 203, 200) rgb(248, 203, 200) rgb(230, 57, 110); border-image: none; background-color: rgb(253, 239, 222);">
+<div class="flex flex-col items-center justify-start pt-1">
+<div class="w-10 h-10 rounded-full bg-tertiary-container/10 flex items-center justify-center text-tertiary-container">
+<span class="material-symbols-outlined" data-icon="check_circle" style="font-variation-settings: &quot;FILL&quot; 1;">check_circle</span>
+</div>
+</div>
+<div class="flex flex-col gap-xs flex-grow">
+<div class="flex justify-between items-start w-full">
+<h3 class="font-label-bold text-label-bold text-tertiary-container uppercase tracking-wider">On Time</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">2 mins ago</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface">Train 12952 is running on time.</p>
+</div>
+</div>
+<!-- Alert Card: Running Early (Blue/Secondary Theme) -->
+
+<!-- Alert Card: Delay Alert (Amber/Yellow Theme using Error colors for severity) -->
+
+<div class="glass-card rounded-xl p-md shadow-sm border-l-4 border-l-primary flex gap-md transition-transform active:scale-[0.98]" style="border-width: 1px 1px 1px 4px; border-style: solid; border-color: rgb(248, 203, 200) rgb(248, 203, 200) rgb(248, 203, 200) rgb(230, 57, 110); border-image: none; background-color: rgb(253, 239, 222);">
+<div class="flex flex-col items-center justify-start pt-1">
+<div class="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center text-primary-container" style="background-color: rgb(248, 203, 200); color: rgb(230, 57, 110);">
+<span class="material-symbols-outlined" data-icon="warning" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+</div>
+<div class="flex flex-col gap-xs flex-grow">
+<div class="flex justify-between items-start w-full">
+<h3 class="font-label-bold text-label-bold text-primary-container uppercase tracking-wider" style="color: rgb(230, 57, 110);">Minor Delay</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">15 mins ago</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface">Train is 18 mins late due to fog. Expected at Mumbai Central (BCT) at 23:53.</p>
+</div>
+</div></div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-2 pb-safe shadow-[0_-2px_10px_rgba(0,0,0,0.08)] rounded-t-xl md:hidden" style="background-color: rgb(253, 239, 222); border-top: 1px solid rgba(230, 57, 110, 0.15);">
+  <button class="flex flex-col items-center justify-center text-on-surface-variant flex-1 transition-colors rounded-xl py-1">
+    <span class="material-symbols-outlined mb-1 text-on-surface-variant">train</span>
+    <span class="text-label-sm font-label-sm text-on-surface-variant">Train View</span>
+  </button>
+  <button class="flex flex-col items-center justify-center text-on-surface-variant flex-1 transition-colors rounded-xl py-1">
+    <span class="material-symbols-outlined mb-1 text-on-surface-variant">location_on</span>
+    <span class="text-label-sm font-label-sm text-on-surface-variant">Track</span>
+  </button>
+  <button class="flex flex-col items-center justify-center text-on-surface-variant flex-1 transition-colors rounded-xl py-1">
+    <span class="material-symbols-outlined mb-1 text-on-surface-variant">bar_chart</span>
+    <span class="text-label-sm font-label-sm text-on-surface-variant">Behavior</span>
+  </button>
+  <button class="flex flex-col items-center justify-center flex-1 py-1" style="color: rgb(230, 57, 110);">
+    <div class="rounded-full px-4 py-1 mb-1 scale-90 transition-transform flex items-center justify-center" style="background-color: rgb(230, 57, 110); color: rgb(255, 255, 255);">
+      <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">notifications</span>
+    </div>
+    <span class="text-label-sm font-label-bold font-bold" style="color: rgb(230, 57, 110);">Alerts</span>
+  </button>
+</nav>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</body></html>

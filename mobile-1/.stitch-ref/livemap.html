@@ -1,0 +1,256 @@
+<!DOCTYPE html><html lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width,initial-scale=1.0" name="viewport">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&amp;display=swap" rel="stylesheet"><link href="https://fonts.cdnfonts.com/css/samarkan" rel="stylesheet">
+<link crossorigin="" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" rel="stylesheet">
+<script crossorigin="" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #fff8f7;
+      font-family: 'Inter', sans-serif;
+    }
+    #map {
+        width: 100%;
+        height: 100%;
+        z-index: 10;
+    }
+    /* Hide Leaflet attribution on mobile to save space */
+    .leaflet-control-attribution {
+        display: none !important;
+    }
+    .leaflet-bar a {
+        background-color: #fff8f7 !important;
+        color: #26181b !important;
+        border-color: #e0bec4 !important;
+    }
+  </style>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "surface-container-high": "#fce2e6",
+                "secondary-fixed-dim": "#d0c5b8",
+                "on-secondary-fixed-variant": "#4d463c",
+                "tertiary-container": "#008536",
+                "outline-variant": "#e0bec4",
+                "secondary-container": "#ece1d3",
+                "on-surface-variant": "#594045",
+                "on-primary-fixed-variant": "#8f0040",
+                "background": "#fff8f7",
+                "tertiary": "#006929",
+                "on-background": "#26181b",
+                "surface-bright": "#fff8f7",
+                "primary-fixed-dim": "#ffb1c2",
+                "on-primary": "#ffffff",
+                "surface-container-highest": "#f6dce0",
+                "on-primary-container": "#fff7f7",
+                "primary-container": "#d32f6a",
+                "primary-fixed": "#ffd9e0",
+                "surface-container": "#ffe8eb",
+                "surface-container-lowest": "#ffffff",
+                "on-secondary-fixed": "#201b13",
+                "surface-dim": "#eed4d8",
+                "inverse-surface": "#3c2c2f",
+                "surface-tint": "#b71456",
+                "error": "#ba1a1a",
+                "on-tertiary-fixed": "#002108",
+                "on-tertiary-fixed-variant": "#00531f",
+                "on-tertiary": "#ffffff",
+                "surface-container-low": "#fff0f1",
+                "surface": "#fff8f7",
+                "tertiary-fixed": "#8dfa9b",
+                "on-tertiary-container": "#ecffe8",
+                "error-container": "#ffdad6",
+                "inverse-primary": "#ffb1c2",
+                "tertiary-fixed-dim": "#70dd82",
+                "on-secondary-container": "#6b6358",
+                "surface-variant": "#f6dce0",
+                "primary": "#b10b52",
+                "inverse-on-surface": "#ffecee",
+                "on-surface": "#26181b",
+                "on-error": "#ffffff",
+                "on-primary-fixed": "#3f0018",
+                "secondary-fixed": "#ece1d3",
+                "on-secondary": "#ffffff",
+                "outline": "#8d7075",
+                "secondary": "#655d53",
+                "on-error-container": "#93000a"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "container-margin": "16px",
+                "lg": "24px",
+                "md": "16px",
+                "gutter": "12px",
+                "sm": "8px",
+                "unit": "4px",
+                "xs": "4px",
+                "xl": "32px"
+        }
+      }
+    }
+  }
+</script>
+</head>
+<body class="bg-background text-on-background relative flex flex-col h-full w-full">
+<!-- Header Overlay -->
+<header class="absolute top-0 left-0 w-full z-20 pointer-events-none">
+<div class="flex items-center justify-between w-full h-16 px-4 shadow-sm border-b border-[#F8CBC8]/60 rounded-b-[28px] pointer-events-auto" style="background-color: rgb(253, 239, 222);"><h1 class="font-bold text-primary text-[20px] tracking-wide leading-none" style="font-family: Inter, sans-serif; color: rgb(230, 57, 110); font-weight: 800; letter-spacing: -0.01em; font-style: normal;">Live Track View</h1><button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors" style="background-color: rgba(230, 57, 110, 0.1); color: rgb(230, 57, 110);"><span class="material-symbols-outlined">close</span></button></div>
+</header>
+<!-- Map Container -->
+<div class="w-full h-full leaflet-container leaflet-touch leaflet-retina leaflet-fade-anim leaflet-grab leaflet-touch-drag leaflet-touch-zoom" id="map" tabindex="0" style="position: relative;"><div class="leaflet-pane leaflet-map-pane" style="transform: translate3d(184px, 137px, 0px);"><div class="leaflet-pane leaflet-tile-pane"><div class="leaflet-layer " style="z-index: 1; opacity: 1;"><div class="leaflet-tile-container leaflet-zoom-animated" style="z-index: 20; transform: translate3d(0px, 0px, 0px) scale(1);"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/45/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 147px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/46/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 147px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/45/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 403px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/46/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 403px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/45/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, -109px, 0px); opacity: 1;"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/46/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, -109px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/45/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 659px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/46/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 659px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/44/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 147px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/44/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, -109px, 0px); opacity: 1;"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/44/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 403px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/45/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, -365px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/44/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, -365px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/46/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, -365px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/44/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 659px, 0px); opacity: 1;"></div></div></div><div class="leaflet-pane leaflet-overlay-pane"><svg pointer-events="none" class="leaflet-zoom-animated" width="468" height="1061" viewBox="-223 -225 468 1061" style="transform: translate3d(-223px, -225px, 0px);"><g><path class="leaflet-interactive" stroke="#d32f6a" stroke-opacity="0.8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" d="M-87 542L-73 385L-7 272L47 154L110 67"></path></g></svg></div><div class="leaflet-pane leaflet-shadow-pane"></div><div class="leaflet-pane leaflet-marker-pane"><div class="leaflet-marker-icon custom-train-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" style="margin-left: -20px; margin-top: -48px; width: 40px; height: 48px; transform: translate3d(23px, 201px, 0px); z-index: 201;">
+                    <div class="w-10 h-10 bg-primary-container rounded-full flex items-center justify-center shadow-md border-2 border-surface">
+                        <span class="material-symbols-outlined text-on-primary-container text-[20px]">train</span>
+                    </div>
+                    <div class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-primary-container drop-shadow-md"></div>
+                </div></div><div class="leaflet-pane leaflet-tooltip-pane"></div><div class="leaflet-pane leaflet-popup-pane"></div><div class="leaflet-proxy leaflet-zoom-animated" style="transform: translate3d(11607px, 7070px, 0px) scale(32);"></div></div><div class="leaflet-control-container"><div class="leaflet-top leaflet-left"></div><div class="leaflet-top leaflet-right"><div class="leaflet-control-zoom leaflet-bar leaflet-control"><a class="leaflet-control-zoom-in" href="#" title="Zoom in" role="button" aria-label="Zoom in" aria-disabled="false"><span aria-hidden="true" class="">+</span></a><a class="leaflet-control-zoom-out" href="#" title="Zoom out" role="button" aria-label="Zoom out" aria-disabled="false"><span aria-hidden="true" class="">−</span></a></div></div><div class="leaflet-bottom leaflet-left"></div><div class="leaflet-bottom leaflet-right"><div class="leaflet-control-attribution leaflet-control"><a href="https://leafletjs.com" title="A JavaScript library for interactive maps" class=""><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8" class="leaflet-attribution-flag"><path fill="#4C7BE1" d="M0 0h12v4H0z"></path><path fill="#FFD500" d="M0 4h12v3H0z"></path><path fill="#E0BC00" d="M0 7h12v1H0z"></path></svg> Leaflet</a> <span aria-hidden="true" class="">|</span> © <a href="https://www.openstreetmap.org/copyright" class="">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions" class="">CARTO</a></div></div></div><div class="leaflet-pane leaflet-map-pane" style="transform: translate3d(184px, 137px, 0px);"><div class="leaflet-pane leaflet-tile-pane"><div class="leaflet-layer " style="z-index: 1; opacity: 1;"><div class="leaflet-tile-container leaflet-zoom-animated" style="z-index: 20; transform: translate3d(0px, 0px, 0px) scale(1);"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/45/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 147px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/46/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 147px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/45/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 403px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/46/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 403px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/45/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, -109px, 0px); opacity: 1;"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/46/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, -109px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/45/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 659px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/46/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 659px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/44/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 147px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/44/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, -109px, 0px); opacity: 1;"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/44/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 403px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/45/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, -365px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/44/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, -365px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/46/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, -365px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/44/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 659px, 0px); opacity: 1;"></div></div></div><div class="leaflet-pane leaflet-overlay-pane"><svg pointer-events="none" class="leaflet-zoom-animated" width="468" height="1061" viewBox="-223 -225 468 1061" style="transform: translate3d(-223px, -225px, 0px);"><g><path class="leaflet-interactive" stroke="#d32f6a" stroke-opacity="0.8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" d="M-87 542L-73 385L-7 272L47 154L110 67"></path></g></svg></div><div class="leaflet-pane leaflet-shadow-pane"></div><div class="leaflet-pane leaflet-marker-pane"><div class="leaflet-marker-icon custom-train-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" style="margin-left: -20px; margin-top: -48px; width: 40px; height: 48px; transform: translate3d(23px, 201px, 0px); z-index: 201;">
+                    <div class="w-10 h-10 bg-primary-container rounded-full flex items-center justify-center shadow-md border-2 border-surface">
+                        <span class="material-symbols-outlined text-on-primary-container text-[20px]">train</span>
+                    </div>
+                    <div class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-primary-container drop-shadow-md"></div>
+                </div></div><div class="leaflet-pane leaflet-tooltip-pane"></div><div class="leaflet-pane leaflet-popup-pane"></div><div class="leaflet-proxy leaflet-zoom-animated" style="transform: translate3d(11607px, 7070px, 0px) scale(32);"></div></div><div class="leaflet-control-container"><div class="leaflet-top leaflet-left"></div><div class="leaflet-top leaflet-right"><div class="leaflet-control-zoom leaflet-bar leaflet-control"><a class="leaflet-control-zoom-in" href="#" title="Zoom in" role="button" aria-label="Zoom in" aria-disabled="false"><span aria-hidden="true" class="">+</span></a><a class="leaflet-control-zoom-out" href="#" title="Zoom out" role="button" aria-label="Zoom out" aria-disabled="false"><span aria-hidden="true" class="">−</span></a></div></div><div class="leaflet-bottom leaflet-left"></div><div class="leaflet-bottom leaflet-right"><div class="leaflet-control-attribution leaflet-control"><a href="https://leafletjs.com" title="A JavaScript library for interactive maps" class=""><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8" class="leaflet-attribution-flag"><path fill="#4C7BE1" d="M0 0h12v4H0z"></path><path fill="#FFD500" d="M0 4h12v3H0z"></path><path fill="#E0BC00" d="M0 7h12v1H0z"></path></svg> Leaflet</a> <span aria-hidden="true" class="">|</span> © <a href="https://www.openstreetmap.org/copyright" class="">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions" class="">CARTO</a></div></div></div><div class="leaflet-pane leaflet-map-pane" style="transform: translate3d(184px, 137px, 0px);"><div class="leaflet-pane leaflet-tile-pane"><div class="leaflet-layer " style="z-index: 1; opacity: 1;"><div class="leaflet-tile-container leaflet-zoom-animated" style="z-index: 20; transform: translate3d(0px, 0px, 0px) scale(1);"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/45/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 147px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/46/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 147px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/45/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 403px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/46/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 403px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/45/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, -109px, 0px); opacity: 1;"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/46/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, -109px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/45/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 659px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/46/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 659px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/44/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 147px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/44/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, -109px, 0px); opacity: 1;"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/44/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 403px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/45/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, -365px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/44/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, -365px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/46/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, -365px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/44/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 659px, 0px); opacity: 1;"></div></div></div><div class="leaflet-pane leaflet-overlay-pane"><svg pointer-events="none" class="leaflet-zoom-animated" width="468" height="1061" viewBox="-223 -225 468 1061" style="transform: translate3d(-223px, -225px, 0px);"><g><path class="leaflet-interactive" stroke="#d32f6a" stroke-opacity="0.8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" d="M-87 542L-73 385L-7 272L47 154L110 67"></path></g></svg></div><div class="leaflet-pane leaflet-shadow-pane"></div><div class="leaflet-pane leaflet-marker-pane"><div class="leaflet-marker-icon custom-train-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" style="margin-left: -20px; margin-top: -48px; width: 40px; height: 48px; transform: translate3d(23px, 201px, 0px); z-index: 201;">
+                    <div class="w-10 h-10 bg-primary-container rounded-full flex items-center justify-center shadow-md border-2 border-surface">
+                        <span class="material-symbols-outlined text-on-primary-container text-[20px]">train</span>
+                    </div>
+                    <div class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-primary-container drop-shadow-md"></div>
+                </div></div><div class="leaflet-pane leaflet-tooltip-pane"></div><div class="leaflet-pane leaflet-popup-pane"></div><div class="leaflet-proxy leaflet-zoom-animated" style="transform: translate3d(11607px, 7070px, 0px) scale(32);"></div></div><div class="leaflet-control-container"><div class="leaflet-top leaflet-left"></div><div class="leaflet-top leaflet-right"><div class="leaflet-control-zoom leaflet-bar leaflet-control"><a class="leaflet-control-zoom-in" href="#" title="Zoom in" role="button" aria-label="Zoom in" aria-disabled="false"><span aria-hidden="true" class="">+</span></a><a class="leaflet-control-zoom-out" href="#" title="Zoom out" role="button" aria-label="Zoom out" aria-disabled="false"><span aria-hidden="true" class="">−</span></a></div></div><div class="leaflet-bottom leaflet-left"></div><div class="leaflet-bottom leaflet-right"><div class="leaflet-control-attribution leaflet-control"><a href="https://leafletjs.com" title="A JavaScript library for interactive maps" class=""><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8" class="leaflet-attribution-flag"><path fill="#4C7BE1" d="M0 0h12v4H0z"></path><path fill="#FFD500" d="M0 4h12v3H0z"></path><path fill="#E0BC00" d="M0 7h12v1H0z"></path></svg> Leaflet</a> <span aria-hidden="true" class="">|</span> © <a href="https://www.openstreetmap.org/copyright" class="">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions" class="">CARTO</a></div></div></div><div class="leaflet-pane leaflet-map-pane" style="transform: translate3d(184px, 137px, 0px);"><div class="leaflet-pane leaflet-tile-pane"><div class="leaflet-layer " style="z-index: 1; opacity: 1;"><div class="leaflet-tile-container leaflet-zoom-animated" style="z-index: 20; transform: translate3d(0px, 0px, 0px) scale(1);"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/45/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 147px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/46/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 147px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/45/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 403px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/46/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 403px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/45/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, -109px, 0px); opacity: 1;"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/46/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, -109px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/45/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 659px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/46/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 659px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/44/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 147px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/44/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, -109px, 0px); opacity: 1;"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/44/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 403px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/45/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, -365px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/44/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, -365px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/46/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, -365px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/44/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 659px, 0px); opacity: 1;"></div></div></div><div class="leaflet-pane leaflet-overlay-pane"><svg pointer-events="none" class="leaflet-zoom-animated" width="468" height="1061" viewBox="-223 -225 468 1061" style="transform: translate3d(-223px, -225px, 0px);"><g><path class="leaflet-interactive" stroke="#d32f6a" stroke-opacity="0.8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" d="M-87 542L-73 385L-7 272L47 154L110 67"></path></g></svg></div><div class="leaflet-pane leaflet-shadow-pane"></div><div class="leaflet-pane leaflet-marker-pane"><div class="leaflet-marker-icon custom-train-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" style="margin-left: -20px; margin-top: -48px; width: 40px; height: 48px; transform: translate3d(23px, 201px, 0px); z-index: 201;">
+                    <div class="w-10 h-10 bg-primary-container rounded-full flex items-center justify-center shadow-md border-2 border-surface">
+                        <span class="material-symbols-outlined text-on-primary-container text-[20px]">train</span>
+                    </div>
+                    <div class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-primary-container drop-shadow-md"></div>
+                </div></div><div class="leaflet-pane leaflet-tooltip-pane"></div><div class="leaflet-pane leaflet-popup-pane"></div><div class="leaflet-proxy leaflet-zoom-animated" style="transform: translate3d(11607px, 7070px, 0px) scale(32);"></div></div><div class="leaflet-control-container"><div class="leaflet-top leaflet-left"></div><div class="leaflet-top leaflet-right"><div class="leaflet-control-zoom leaflet-bar leaflet-control"><a class="leaflet-control-zoom-in" href="#" title="Zoom in" role="button" aria-label="Zoom in" aria-disabled="false"><span aria-hidden="true" class="">+</span></a><a class="leaflet-control-zoom-out" href="#" title="Zoom out" role="button" aria-label="Zoom out" aria-disabled="false"><span aria-hidden="true" class="">−</span></a></div></div><div class="leaflet-bottom leaflet-left"></div><div class="leaflet-bottom leaflet-right"><div class="leaflet-control-attribution leaflet-control"><a href="https://leafletjs.com" title="A JavaScript library for interactive maps" class=""><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8" class="leaflet-attribution-flag"><path fill="#4C7BE1" d="M0 0h12v4H0z"></path><path fill="#FFD500" d="M0 4h12v3H0z"></path><path fill="#E0BC00" d="M0 7h12v1H0z"></path></svg> Leaflet</a> <span aria-hidden="true" class="">|</span> © <a href="https://www.openstreetmap.org/copyright" class="">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions" class="">CARTO</a></div></div></div><div class="leaflet-pane leaflet-map-pane" style="transform: translate3d(184px, 137px, 0px);"><div class="leaflet-pane leaflet-tile-pane"><div class="leaflet-layer " style="z-index: 1; opacity: 1;"><div class="leaflet-tile-container leaflet-zoom-animated" style="z-index: 20; transform: translate3d(0px, 0px, 0px) scale(1);"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/45/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 147px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/46/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 147px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/45/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 403px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/46/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 403px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/45/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, -109px, 0px); opacity: 1;"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/46/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, -109px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/45/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, 659px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/46/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, 659px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/44/27@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 147px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/44/26@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, -109px, 0px); opacity: 1;"><img alt="" src="https://a.basemaps.cartocdn.com/rastertiles/voyager/6/44/28@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 403px, 0px); opacity: 1;"><img alt="" src="https://c.basemaps.cartocdn.com/rastertiles/voyager/6/45/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-76px, -365px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/44/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, -365px, 0px); opacity: 1;"><img alt="" src="https://d.basemaps.cartocdn.com/rastertiles/voyager/6/46/25@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(180px, -365px, 0px); opacity: 1;"><img alt="" src="https://b.basemaps.cartocdn.com/rastertiles/voyager/6/44/29@2x.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-332px, 659px, 0px); opacity: 1;"></div></div></div><div class="leaflet-pane leaflet-overlay-pane"><svg pointer-events="none" class="leaflet-zoom-animated" width="468" height="1061" viewBox="-223 -225 468 1061" style="transform: translate3d(-223px, -225px, 0px);"><g><path class="leaflet-interactive" stroke="#d32f6a" stroke-opacity="0.8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" d="M-87 542L-73 385L-7 272L47 154L110 67"></path></g></svg></div><div class="leaflet-pane leaflet-shadow-pane"></div><div class="leaflet-pane leaflet-marker-pane"><div class="leaflet-marker-icon custom-train-icon leaflet-zoom-animated leaflet-interactive" tabindex="0" role="button" style="margin-left: -20px; margin-top: -48px; width: 40px; height: 48px; transform: translate3d(23px, 201px, 0px); z-index: 201;">
+                    <div class="w-10 h-10 bg-primary-container rounded-full flex items-center justify-center shadow-md border-2 border-surface">
+                        <span class="material-symbols-outlined text-on-primary-container text-[20px]">train</span>
+                    </div>
+                    <div class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-primary-container drop-shadow-md"></div>
+                </div></div><div class="leaflet-pane leaflet-tooltip-pane"></div><div class="leaflet-pane leaflet-popup-pane"></div><div class="leaflet-proxy leaflet-zoom-animated" style="transform: translate3d(11607px, 7070px, 0px) scale(32);"></div></div><div class="leaflet-control-container"><div class="leaflet-top leaflet-left"></div><div class="leaflet-top leaflet-right"><div class="leaflet-control-zoom leaflet-bar leaflet-control"><a class="leaflet-control-zoom-in" href="#" title="Zoom in" role="button" aria-label="Zoom in" aria-disabled="false"><span aria-hidden="true" class="">+</span></a><a class="leaflet-control-zoom-out" href="#" title="Zoom out" role="button" aria-label="Zoom out" aria-disabled="false"><span aria-hidden="true" class="">−</span></a></div></div><div class="leaflet-bottom leaflet-left"></div><div class="leaflet-bottom leaflet-right"><div class="leaflet-control-attribution leaflet-control"><a href="https://leafletjs.com" title="A JavaScript library for interactive maps" class=""><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8" class="leaflet-attribution-flag"><path fill="#4C7BE1" d="M0 0h12v4H0z"></path><path fill="#FFD500" d="M0 4h12v3H0z"></path><path fill="#E0BC00" d="M0 7h12v1H0z"></path></svg> Leaflet</a> <span aria-hidden="true" class="">|</span> © <a href="https://www.openstreetmap.org/copyright" class="">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions" class="">CARTO</a></div></div></div></div>
+<!-- Status Overlay -->
+<div class="absolute bottom-[72px] left-0 w-full z-20 px-4 pointer-events-none">
+<div class="bg-surface-container-highest/95 backdrop-blur-md rounded-xl p-4 shadow-lg border border-outline-variant pointer-events-auto" style="background-color: rgb(253, 239, 222); border-color: rgb(248, 203, 200);">
+<div class="flex items-center gap-3 mb-2">
+<div class="relative flex items-center justify-center w-3 h-3">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-75" style="background-color: rgb(0, 105, 41);"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-tertiary" style="background-color: rgb(0, 105, 41);"></span>
+</div>
+<span class="text-label-sm font-semibold text-tertiary uppercase tracking-wider" style="color: rgb(0, 105, 41);">GPS Tracking Active</span>
+</div><hr class="border-t my-2.5 border-outline" style="border-color: rgba(177, 11, 82, 0.35);">
+<div class="flex justify-between items-end">
+<div>
+<p class="text-body-md text-on-surface-variant">Train 12951 • Rajdhani Express</p>
+<p class="text-body-lg font-medium text-on-surface mt-0.5">Approaching New Delhi</p>
+</div>
+<div class="text-center"><span class="block text-display-lg font-bold text-primary leading-none" style="color: rgb(230, 57, 110);">115</span><span class="text-label-sm text-on-surface-variant">km/h</span></div>
+</div>
+</div>
+</div>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize map centered roughly on a track section between Mumbai and Delhi
+            const map = L.map('map', {
+                zoomControl: false // Move zoom control to avoid header/footer overlap
+            }).setView([21.1458, 79.0882], 6); // Central India
+
+            // Add map tiles (using a light theme to match UI)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 20
+            }).addTo(map);
+
+            // Add custom zoom control position
+            L.control.zoom({
+                position: 'topright'
+            }).addTo(map);
+
+            // Mock GeoJSON for a railway track (Delhi to Mumbai approx route)
+            const trackGeoJSON = {
+                "type": "Feature",
+                "properties": {},
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [72.8777, 19.0760], // Mumbai
+                        [73.1812, 22.3072], // Vadodara
+                        [74.6399, 24.5854], // Chittorgarh
+                        [75.8235, 26.9124], // Jaipur
+                        [77.2090, 28.6139]  // Delhi
+                    ]
+                }
+            };
+
+            // Style the track with brand primary container color
+            L.geoJSON(trackGeoJSON, {
+                style: {
+                    color: '#d32f6a', // Primary container color from Tailwind config
+                    weight: 4,
+                    opacity: 0.8,
+                    lineJoin: 'round'
+                }
+            }).addTo(map);
+
+            // Current train position (mock data - somewhere near Jaipur)
+            const currentPosition = [26.0, 75.3];
+
+            // Custom Train Icon using HTML/Tailwind
+            const trainIcon = L.divIcon({
+                className: 'custom-train-icon',
+                html: `
+                    <div class="w-10 h-10 bg-primary-container rounded-full flex items-center justify-center shadow-md border-2 border-surface">
+                        <span class="material-symbols-outlined text-on-primary-container text-[20px]">train</span>
+                    </div>
+                    <div class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-primary-container drop-shadow-md"></div>
+                `,
+                iconSize: [40, 48],
+                iconAnchor: [20, 48]
+            });
+
+            // Add marker to map
+            L.marker(currentPosition, { icon: trainIcon }).addTo(map);
+
+            // Fit bounds to show route nicely on mobile
+            map.fitBounds(L.geoJSON(trackGeoJSON).getBounds(), {
+                padding: [40, 150] // Add padding to account for header/footer
+            });
+        });
+    </script>
+
+
+
+
+<nav class="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around py-2 border-t border-[#F8CBC8]/60 shadow-lg" style="background-color: rgb(253, 239, 222);"><a href="#" class="flex flex-col items-center justify-center min-w-[64px] text-on-surface-variant/80 hover:text-primary transition-colors">
+    <span class="material-symbols-outlined text-[24px]">directions_railway</span>
+    <span class="text-[11px] font-medium tracking-tight mt-0.5">Train View</span>
+  </a>
+  <a href="#" class="flex flex-col items-center justify-center min-w-[64px] text-[#E6396E]">
+    <div class="px-4 py-1 rounded-full bg-[#E6396E] text-white flex items-center justify-center shadow-sm">
+      <span class="material-symbols-outlined text-[20px]">location_on</span>
+    </div>
+    <span class="text-[11px] font-bold tracking-tight mt-0.5 text-[#E6396E]">Track</span>
+  </a>
+  <a href="#" class="flex flex-col items-center justify-center min-w-[64px] text-on-surface-variant/80 hover:text-primary transition-colors">
+    <span class="material-symbols-outlined text-[24px]">bar_chart</span>
+    <span class="text-[11px] font-medium tracking-tight mt-0.5">Behavior</span>
+  </a>
+  <a href="#" class="flex flex-col items-center justify-center min-w-[64px] text-on-surface-variant/80 hover:text-primary transition-colors">
+    <span class="material-symbols-outlined text-[24px]">notifications</span>
+    <span class="text-[11px] font-medium tracking-tight mt-0.5">Alerts</span>
+  </a></nav>
+
+
+
+
+
+</body></html>

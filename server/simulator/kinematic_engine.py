@@ -62,12 +62,14 @@ class TrainSimulator:
                 "station_name": s.get("station_name"),
                 "arrival": s.get("arrival"),
                 "departure": s.get("departure"),
+                "day": int(s.get("day", 1) or 1),
                 "halt_min": s.get("halt_min", 2),
                 "lat": float(lat),
                 "lon": float(lon),
                 "section_km": round(sec_dist, 2),
                 "cum_dist_km": round(cum_dist, 2)
             })
+
             prev_lat, prev_lon = lat, lon
 
         if not self.route_stops:
@@ -141,12 +143,45 @@ class TrainSimulator:
 
         if found_idx is not None:
             self.current_stop_idx = min(found_idx, len(self.route_stops) - 2)
-            self.current_lat = self.route_stops[found_idx]["lat"]
-            self.current_lon = self.route_stops[found_idx]["lon"]
+            self.last_anchored_ntes_station = target_code
+            self.last_anchored_ntes_delay = float(delay_min)
+
+            if self.route_stops[found_idx]["station_code"].upper() == target_code:
+                self.current_lat = self.route_stops[found_idx]["lat"]
+                self.current_lon = self.route_stops[found_idx]["lon"]
+                self.section_dist_covered_km = 0.0
+            else:
+                from server.database import get_db_connection
+                try:
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute("SELECT lat, lon FROM stations WHERE station_code = ?", (target_code,))
+                    row = c.fetchone()
+                    conn.close()
+                    if row and row["lat"] and row["lon"]:
+                        self.current_lat = float(row["lat"])
+                        self.current_lon = float(row["lon"])
+                        d_km = haversine_distance_km(
+                            self.route_stops[found_idx]["lat"],
+                            self.route_stops[found_idx]["lon"],
+                            self.current_lat,
+                            self.current_lon
+                        )
+                        nxt_stop = self.route_stops[self.current_stop_idx + 1]
+                        target_sec_km = nxt_stop.get("section_km", 50.0)
+                        self.section_dist_covered_km = min(target_sec_km * 0.95, max(1.0, d_km))
+                    else:
+                        self.current_lat = self.route_stops[found_idx]["lat"]
+                        self.current_lon = self.route_stops[found_idx]["lon"]
+                        self.section_dist_covered_km = 0.0
+                except Exception:
+                    self.current_lat = self.route_stops[found_idx]["lat"]
+                    self.current_lon = self.route_stops[found_idx]["lon"]
+                    self.section_dist_covered_km = 0.0
+
             self.current_delay_min = float(delay_min)
             self.delay_history = [max(0.0, delay_min - 3.0), float(delay_min)]
             self.current_speed_kmh = speed_kmh
-            self.section_dist_covered_km = 0.0
             self.status = "RUNNING"
             return True
 
@@ -292,18 +327,11 @@ class TrainSimulator:
             self.current_speed_kmh = 0.0
             self.status = "DWELLING"
             
-            dwell_anomaly_sec = random.expovariate(1.0 / 60.0) if random.random() < 0.3 else 0.0
-            self.dwell_remaining_sec = (next_stop.get("halt_min", 2) * 60.0) + dwell_anomaly_sec
+            self.dwell_remaining_sec = next_stop.get("halt_min", 2) * 60.0
 
             nominal_sec = (target_section_km / self.max_speed_kmh) * 3600.0
             actual_sec = (target_section_km / max(20.0, self.get_effective_max_speed(visibility_m, precipitation_mm))) * 3600.0
             delay_added_min = max(0.0, (actual_sec - nominal_sec) / 60.0)
-            
-            if random.random() < 0.15:
-                delay_added_min += random.uniform(3.0, 8.0)
-            
-            if self.priority >= 4 and random.random() < 0.25:
-                delay_added_min += random.uniform(5.0, 15.0)
 
             self.current_delay_min = round(self.current_delay_min + delay_added_min, 1)
             self.delay_history.append(self.current_delay_min)
@@ -314,6 +342,10 @@ class TrainSimulator:
         curr = self.route_stops[min(self.current_stop_idx, len(self.route_stops) - 1)]
         nxt_idx = min(self.current_stop_idx + 1, len(self.route_stops) - 1)
         nxt = self.route_stops[nxt_idx]
+        last_stop = self.route_stops[-1]
+        
+        rem_dist = max(0.0, float(last_stop.get("cum_dist_km", 0.0)) - float(curr.get("cum_dist_km", 0.0)) - self.section_dist_covered_km)
+        sched_dwell = float(curr.get("halt_min", 2.0))
 
         return {
             "train_no": self.train_no,
@@ -331,5 +363,12 @@ class TrainSimulator:
             "delay_history": self.delay_history,
             "status": self.status,
             "section_distance_km": nxt.get("section_km", 15.0),
-            "priority_rank": self.priority
+            "priority_rank": self.priority,
+            "max_permitted_speed": self.max_speed_kmh,
+            "sched_dwell_min": sched_dwell,
+            "prev_departure_time": curr.get("departure") or curr.get("arrival"),
+            "scheduled_arrival_time": nxt.get("arrival") or nxt.get("departure"),
+            "dist_to_destination_km": round(rem_dist, 2),
+            "is_loco_reversal": 1 if sched_dwell >= 20.0 else 0
         }
+

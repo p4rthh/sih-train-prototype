@@ -1,5 +1,5 @@
 import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from fastapi import APIRouter, HTTPException, Query
 
 from server.database import (
@@ -38,6 +38,82 @@ SIMULATOR_LAST_TICK: Dict[str, datetime.datetime] = {}
 SIMULATOR_SOURCE: Dict[str, str] = {}
 SIMULATOR_DESC: Dict[str, Optional[str]] = {}
 
+class StableETATracker:
+    def __init__(self):
+        self._cache: Dict[str, Dict[str, Any]] = {}
+
+    def get_stable_prediction(
+        self,
+        train_no: str,
+        current_stop_idx: int,
+        current_delay_min: float,
+        candidate_forecast_delay: float,
+        candidate_point_eta_dt: datetime.datetime,
+        candidate_lower_eta_dt: datetime.datetime,
+        candidate_upper_eta_dt: datetime.datetime,
+        candidate_route_progress: List[RouteStop],
+        now_ist: datetime.datetime,
+        min_physical_eta_dt: Optional[datetime.datetime] = None,
+    ) -> Tuple[float, datetime.datetime, datetime.datetime, datetime.datetime, List[RouteStop]]:
+        cached = self._cache.get(train_no)
+        if not cached:
+            entry = {
+                "stop_idx": current_stop_idx,
+                "ntes_delay": current_delay_min,
+                "forecasted_delay": round(candidate_forecast_delay, 1),
+                "point_eta_dt": candidate_point_eta_dt,
+                "lower_eta_dt": candidate_lower_eta_dt,
+                "upper_eta_dt": candidate_upper_eta_dt,
+                "route_progress": candidate_route_progress,
+                "last_update": now_ist
+            }
+            self._cache[train_no] = entry
+            return (
+                entry["forecasted_delay"],
+                entry["point_eta_dt"],
+                entry["lower_eta_dt"],
+                entry["upper_eta_dt"],
+                entry["route_progress"]
+            )
+
+        station_changed = (current_stop_idx != cached["stop_idx"])
+        ntes_jump = (abs(current_delay_min - cached["ntes_delay"]) >= 1.5)
+        forecast_jump = (abs(candidate_forecast_delay - cached["forecasted_delay"]) >= 2.0)
+        
+        physical_breach = False
+        if min_physical_eta_dt and cached["point_eta_dt"] < min_physical_eta_dt:
+            physical_breach = True
+        elif cached["point_eta_dt"] < now_ist + datetime.timedelta(minutes=1.0):
+            physical_breach = True
+
+        if station_changed or ntes_jump or forecast_jump or physical_breach:
+            if physical_breach and min_physical_eta_dt and not station_changed and not ntes_jump:
+                push_dt = max(cached["point_eta_dt"], min_physical_eta_dt)
+                diff = push_dt - cached["point_eta_dt"]
+                cached["point_eta_dt"] = push_dt
+                cached["lower_eta_dt"] += diff
+                cached["upper_eta_dt"] += diff
+                cached["last_update"] = now_ist
+            else:
+                cached["stop_idx"] = current_stop_idx
+                cached["ntes_delay"] = current_delay_min
+                cached["forecasted_delay"] = round(candidate_forecast_delay, 1)
+                cached["point_eta_dt"] = candidate_point_eta_dt
+                cached["lower_eta_dt"] = candidate_lower_eta_dt
+                cached["upper_eta_dt"] = candidate_upper_eta_dt
+                cached["route_progress"] = candidate_route_progress
+                cached["last_update"] = now_ist
+
+        return (
+            cached["forecasted_delay"],
+            cached["point_eta_dt"],
+            cached["lower_eta_dt"],
+            cached["upper_eta_dt"],
+            cached["route_progress"]
+        )
+
+STABLE_ETA_TRACKER = StableETATracker()
+
 def init_ml_engine():
     global shap_explainer
     if ml_model.load():
@@ -62,6 +138,57 @@ def parse_schedule_time(time_str: Optional[str], day_offset: int = 1, base_date:
         return datetime.datetime(st_date.year, st_date.month, st_date.day, h, m, tzinfo=IST)
     except Exception:
         return None
+
+def get_journey_start_date(sim: TrainSimulator, now_ist: datetime.datetime) -> datetime.date:
+    if sim.status in ["YET_TO_START", "NOT_RUNNING_TODAY", "CANCELLED"]:
+        return now_ist.date()
+
+    curr_idx = min(sim.current_stop_idx, len(sim.route_stops) - 1)
+    curr_stop = sim.route_stops[curr_idx]
+    curr_day = max(1, int(curr_stop.get("day", 1)))
+
+    orig_stop = sim.route_stops[0]
+    orig_dep = orig_stop.get("departure") or "12:00:00"
+    try:
+        oh, om = map(int, str(orig_dep).split(":")[:2])
+    except Exception:
+        oh, om = 12, 0
+
+    if curr_day == 1:
+        if curr_idx >= 1 and oh > now_ist.hour:
+            return now_ist.date() - datetime.timedelta(days=1)
+        return now_ist.date()
+    else:
+        base = now_ist.date() - datetime.timedelta(days=curr_day - 1)
+        c_dep = curr_stop.get("departure") or curr_stop.get("arrival") or "12:00:00"
+        try:
+            ch, cm = map(int, str(c_dep).split(":")[:2])
+            if ch >= 20 and now_ist.hour < 6:
+                base -= datetime.timedelta(days=1)
+        except Exception:
+            pass
+        return base
+
+def parse_stop_datetime(stop: Dict[str, Any], journey_start_date: datetime.date, use_arrival: bool = True) -> Optional[datetime.datetime]:
+    if use_arrival:
+        raw = stop.get("arrival") if stop.get("arrival") != "START" else stop.get("departure")
+        if not raw or str(raw).strip() in ["None", "START", "--", ""]:
+            raw = stop.get("departure")
+    else:
+        raw = stop.get("departure") if stop.get("departure") != "None" else stop.get("arrival")
+        if not raw or str(raw).strip() in ["None", "START", "--", ""]:
+            raw = stop.get("arrival")
+    if not raw or str(raw).strip() in ["None", "--", ""]:
+        return None
+    try:
+        parts = str(raw).strip().split(":")
+        h, m = int(parts[0]), int(parts[1])
+        day = max(1, int(stop.get("day", 1)))
+        st_date = journey_start_date + datetime.timedelta(days=day - 1)
+        return datetime.datetime(st_date.year, st_date.month, st_date.day, h, m, tzinfo=IST)
+    except Exception:
+        return None
+
 
 def get_or_create_simulator(train_no: str) -> TrainSimulator:
     raw_no = str(train_no).strip()
@@ -109,24 +236,31 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
     anchor = get_live_ntes_anchor(t_no)
     if anchor:
         run_st = anchor.get("run_status", "RUNNING")
-        stn = anchor.get("last_station_code") or sim.route_stops[0]["station_code"]
+        stn = (anchor.get("last_station_code") or sim.route_stops[0]["station_code"]).strip().upper()
         nxt_stn = anchor.get("next_station_code")
         del_m = float(anchor.get("current_delay_min") or 0.0)
-        curr_code = sim.route_stops[min(sim.current_stop_idx, len(sim.route_stops)-1)]["station_code"].upper()
-        if curr_code != stn.upper() or sim.status != run_st:
+        last_stn = getattr(sim, "last_anchored_ntes_station", None)
+        if last_stn != stn or sim.status != run_st or abs(sim.current_delay_min - del_m) >= 2.0:
             sim.anchor_to_ntes(stn, del_m, run_status=run_st, next_station_code=nxt_stn)
             SIMULATOR_SOURCE[t_no] = "NTES_REALTIME"
-            SIMULATOR_DESC[t_no] = anchor.get("position_desc") or f"Live at {stn}"
-    
+            SIMULATOR_DESC[t_no] = anchor.get("position_desc") or f"Live at {stn} (+{int(del_m)}m delay)"
+        else:
+            sim.current_delay_min = del_m
+            if sim.delay_history:
+                sim.delay_history[-1] = del_m
+
     if sim.status == "RUNNING":
         curr_stn = sim.route_stops[min(sim.current_stop_idx, len(sim.route_stops) - 1)]["station_code"]
         weather = weather_client.get_weather(curr_stn, sim.current_lat, sim.current_lon)
         sim.tick(elapsed_sec, weather.get("visibility_m", 10000.0), weather.get("precipitation_mm", 0.0))
+        if anchor:
+            sim.current_delay_min = del_m
     else:
         sim.current_speed_kmh = 0.0
 
     SIMULATOR_LAST_TICK[t_no] = now_ist
     return sim
+
 
 @router.get("/trains/search", response_model=List[TrainSearchResult])
 def search_trains_endpoint(q: str = Query(..., min_length=1)):
@@ -242,16 +376,27 @@ def get_train_eta_endpoint(train_no: str):
                 sim.route_stops,
                 state["current_stop_idx"],
                 state["delay_history"],
-                weather
+                weather,
+                priority_rank=state.get("priority_rank", 2)
             )
         else:
             pred_delta_stgcn = pred_delta_lgb
 
-        pred_delta = stacking_ensemble.predict_delta(pred_delta_lgb, pred_delta_stgcn, hop_dist=1)
+        pred_delta = stacking_ensemble.predict_delta(
+            pred_delta_lgb,
+            pred_delta_stgcn,
+            hop_dist=1,
+            context={"priority": state.get("priority_rank", 2), "current_delay": curr_delay}
+        )
         forecasted_delay = max(0.0, curr_delay + pred_delta)
-        low_delta, high_delta = cqr_calibrator.predict_interval(preds["q10_delta"], preds["q90_delta"])
+        low_delta, high_delta = cqr_calibrator.predict_interval(
+            preds["q10_delta"],
+            preds["q90_delta"],
+            priority=state.get("priority_rank", 2),
+            progress=state.get("trip_progress_ratio", 0.5)
+        )
         window_lower_min = max(0.0, curr_delay + low_delta)
-        window_upper_min = max(window_lower_min + 2.0, curr_delay + high_delta)
+        window_upper_min = max(window_lower_min + 1.5, curr_delay + high_delta)
 
         if shap_explainer:
             reasons_list = shap_explainer.explain(feat_df)
@@ -271,6 +416,19 @@ def get_train_eta_endpoint(train_no: str):
             "impact_min": 0.0
         }]
 
+    priority_rank = state.get("priority_rank", 2)
+    hist_profile = HistoricalProfileManager.get_profile(sim.train_no, priority_rank)
+    has_live = bool(SIMULATOR_SOURCE.get(t_no) == "NTES_REALTIME" or anchor is not None)
+    recovery_traj = HistoricalRecoveryEngine.compute_corridor_recovery_trajectory(
+        train_no=sim.train_no,
+        priority_rank=priority_rank,
+        route_stops=sim.route_stops,
+        current_stop_idx=state["current_stop_idx"],
+        current_delay_min=curr_delay,
+        start_time_ist=now_ist,
+        has_live_anchor=has_live
+    )
+
     nxt_idx = 0 if (is_yet_to_start or is_not_running or is_cancelled) else min(state["current_stop_idx"] + 1, len(sim.route_stops) - 1)
     nxt_stop = sim.route_stops[nxt_idx]
 
@@ -281,9 +439,24 @@ def get_train_eta_endpoint(train_no: str):
     else:
         raw_sched = nxt_stop.get("arrival") or nxt_stop.get("departure") or "--:--"
     sched_str = str(raw_sched)[:5] if len(str(raw_sched)) >= 5 and str(raw_sched) != "START" else str(raw_sched)
+    journey_start = get_journey_start_date(sim, now_ist)
+
+    # Ground forecasted delay in historical arrival & departure records
+    if not (is_not_running or is_cancelled or is_yet_to_start or is_completed):
+        nxt_rec = recovery_traj[nxt_idx] if nxt_idx < len(recovery_traj) else {}
+        base_hist_delay = float(nxt_rec.get("forecasted_delay_min") if nxt_rec.get("forecasted_delay_min") is not None else curr_delay)
+        forecasted_delay = max(curr_delay, round(base_hist_delay + (pred_delta if ml_model.is_fitted else 0.0), 1))
+        
+        if forecasted_delay >= 4.0 and (not reasons_list or "Normal operational" in reasons_list[0]["reason"]):
+            stn_name = nxt_stop.get("station_name", "intermediate section")
+            reasons_list = [{
+                "reason": f"Expected junction & sectional regulation at {stn_name} based on historical operational records",
+                "severity": "MEDIUM" if forecasted_delay >= 15.0 else "LOW",
+                "impact_min": round(forecasted_delay, 1)
+            }]
 
     if is_not_running or is_cancelled or is_yet_to_start:
-        point_eta_dt = parse_schedule_time(sched_str, sim.route_stops[0].get("day", 1), now_ist.date()) or now_ist
+        point_eta_dt = parse_stop_datetime(sim.route_stops[0], journey_start) or now_ist
         lower_eta_dt = point_eta_dt
         upper_eta_dt = point_eta_dt
     elif is_completed:
@@ -291,36 +464,17 @@ def get_train_eta_endpoint(train_no: str):
         lower_eta_dt = now_ist
         upper_eta_dt = now_ist
     else:
-        sec_dist = float(nxt_stop.get("section_km") or 15.0)
-        rem_dist = max(0.5, sec_dist - sim.section_dist_covered_km)
-        curr_speed = float(state["speed_kmh"])
-        eff_speed = curr_speed if curr_speed >= 35.0 else max(40.0, sim.max_speed_kmh * 0.75)
-        transit_mins = (rem_dist / eff_speed) * 60.0
-
-        sched_dt = parse_schedule_time(sched_str, nxt_stop.get("day", 1), now_ist.date())
+        sched_dt = parse_stop_datetime(nxt_stop, journey_start)
         if sched_dt is not None:
-            if sched_dt < now_ist - datetime.timedelta(hours=8):
-                sched_dt += datetime.timedelta(days=1)
-            eta_from_schedule = sched_dt + datetime.timedelta(minutes=forecasted_delay)
-            eta_from_kinematics = now_ist + datetime.timedelta(minutes=transit_mins)
-            point_eta_dt = max(eta_from_schedule, eta_from_kinematics)
+            point_eta_dt = sched_dt + datetime.timedelta(minutes=round(forecasted_delay))
+            if point_eta_dt < now_ist:
+                point_eta_dt = now_ist + datetime.timedelta(minutes=1.0)
         else:
-            point_eta_dt = now_ist + datetime.timedelta(minutes=max(3.0, transit_mins + (pred_delta if ml_model.is_fitted else 2.0)))
+            point_eta_dt = now_ist + datetime.timedelta(minutes=max(2.0, round(forecasted_delay)))
 
         cqr_margin = max(2.0, cqr_calibrator.q_hat if cqr_calibrator.q_hat > 0 else 3.0)
         lower_eta_dt = max(now_ist + datetime.timedelta(minutes=1.0), point_eta_dt - datetime.timedelta(minutes=cqr_margin))
-        upper_eta_dt = point_eta_dt + datetime.timedelta(minutes=cqr_margin + 2.0)
-
-    priority_rank = state.get("priority_rank", 2)
-    hist_profile = HistoricalProfileManager.get_profile(sim.train_no, priority_rank)
-    recovery_traj = HistoricalRecoveryEngine.compute_corridor_recovery_trajectory(
-        train_no=sim.train_no,
-        priority_rank=priority_rank,
-        route_stops=sim.route_stops,
-        current_stop_idx=state["current_stop_idx"],
-        current_delay_min=forecasted_delay,
-        start_time_ist=point_eta_dt
-    )
+        upper_eta_dt = point_eta_dt + datetime.timedelta(minutes=cqr_margin)
 
     route_progress = []
     prev_milestone_dt = point_eta_dt
@@ -329,69 +483,129 @@ def get_train_eta_endpoint(train_no: str):
         is_rec = False
         rec_amt = 0.0
 
+        raw_arr = stop.get("arrival")
+        raw_dep = stop.get("departure")
+        halt_m = int(stop.get("halt_min") or 0)
+        if halt_m <= 0 and raw_arr and raw_dep and raw_arr not in ["START", "None", "--"] and raw_dep not in ["START", "None", "--"]:
+            try:
+                ah, am = map(int, str(raw_arr).split(":")[:2])
+                dh, dm = map(int, str(raw_dep).split(":")[:2])
+                diff_m = (dh * 60 + dm) - (ah * 60 + am)
+                if diff_m < 0:
+                    diff_m += 1440
+                halt_m = max(0, diff_m)
+            except Exception:
+                pass
+        if halt_m <= 0 and raw_arr != "START" and raw_dep != "None" and idx < len(sim.route_stops) - 1:
+            halt_m = 2
+
         if is_not_running or is_cancelled:
             status = "current" if idx == 0 else "upcoming"
             d_min = 0.0
+            eta_arr = "CANCELLED"
+            eta_dep = "CANCELLED"
             raw_t = stop.get("departure") if idx == 0 else (stop.get("arrival") or stop.get("departure") or "--:--")
             eta_time = "CANCELLED" if is_cancelled else (str(raw_t)[:5] if raw_t and raw_t != "START" else "--:--")
         elif is_yet_to_start:
+            d_min = 0.0
             if idx == 0:
                 status = "current"
-                d_min = 0.0
-                eta_time = str(stop.get("departure") or "NOW")[:5]
+                eta_arr = "START"
+                eta_dep = str(raw_dep)[:5] if raw_dep and raw_dep != "None" else "NOW"
+                eta_time = eta_dep
             else:
                 status = "upcoming"
-                d_min = 0.0
-                eta_time = str(stop.get("arrival") or stop.get("departure") or "--:--")[:5]
+                eta_arr = str(raw_arr)[:5] if raw_arr and raw_arr != "START" else "--:--"
+                eta_dep = str(raw_dep)[:5] if raw_dep and raw_dep != "None" else "--:--"
+                eta_time = eta_arr
         elif is_completed:
             if idx == len(sim.route_stops) - 1:
                 status = "current"
                 d_min = curr_delay
+                eta_arr = "ARRIVED"
+                eta_dep = "DESTINATION"
                 eta_time = "ARRIVED"
             else:
                 status = "departed"
                 d_min = 0.0
+                eta_arr = "PASSED"
+                eta_dep = "DEPARTED"
                 eta_time = None
         elif idx < state["current_stop_idx"]:
             status = "departed"
             d_min = state["delay_history"][min(idx, len(state["delay_history"])-1)]
+            eta_arr = "PASSED"
+            eta_dep = "DEPARTED"
             eta_time = None
         elif idx == state["current_stop_idx"]:
-            status = "current"
-            d_min = curr_delay
-            eta_time = "NOW"
+            if sim.status == "DWELLING" or (sim.status == "YET_TO_START" and idx == 0):
+                status = "current"
+                d_min = curr_delay
+                eta_arr = "AT PLATFORM" if idx > 0 else "SOURCE"
+                eta_dep = "NOW"
+                eta_time = "NOW"
+            else:
+                status = "departed"
+                d_min = state["delay_history"][min(idx, len(state["delay_history"])-1)] if state.get("delay_history") else curr_delay
+                eta_arr = "PASSED"
+                eta_dep = "DEPARTED"
+                eta_time = None
         elif idx == state["current_stop_idx"] + 1:
             status = "upcoming"
             d_min = forecasted_delay
-            eta_time = point_eta_dt.strftime("%H:%M")
+            rec_node = recovery_traj[idx] if idx < len(recovery_traj) else {}
+            dep_d_min = float(rec_node.get("departure_delay_min", d_min))
+            eta_arr = point_eta_dt.strftime("%H:%M")
+            if raw_dep and raw_dep != "None" and idx < len(sim.route_stops) - 1:
+                s_dep_dt = parse_stop_datetime(stop, journey_start, use_arrival=False)
+                if s_dep_dt:
+                    cand_dep = s_dep_dt + datetime.timedelta(minutes=round(dep_d_min))
+                    eta_dep = cand_dep.strftime("%H:%M")
+                else:
+                    eta_dep = eta_arr
+            else:
+                eta_dep = "TERMINAL"
+            eta_time = eta_arr
             prev_milestone_dt = point_eta_dt
         else:
             status = "upcoming"
             hop_hops = idx - state["current_stop_idx"]
             multihop_delta = stacking_ensemble.predict_delta(
-                preds["point_delta"] if ml_model.is_fitted else 2.0,
+                preds["point_delta"] if ml_model.is_fitted else 1.5,
                 pred_delta_stgcn,
-                hop_dist=hop_hops
+                hop_dist=hop_hops,
+                context={"priority": priority_rank, "current_delay": curr_delay}
             )
             rec_node = recovery_traj[idx] if idx < len(recovery_traj) else {}
-            base_rec_delay = rec_node.get("forecasted_delay_min", curr_delay)
-            d_min = max(0.0, round(base_rec_delay + (multihop_delta * 0.2), 1))
+            base_rec_delay = float(rec_node.get("forecasted_delay_min", curr_delay))
+            dep_d_min = float(rec_node.get("departure_delay_min", base_rec_delay))
+            # Autoregressive forward delay propagation
+            d_min = max(0.0, round(base_rec_delay + (multihop_delta * max(0.05, 0.25 - 0.02 * min(10, hop_hops))), 1))
             is_rec = bool(rec_node.get("is_recovered", False))
             rec_amt = float(rec_node.get("recovered_min", 0.0))
 
-            stn_sched_str = stop.get("arrival") or stop.get("departure")
-            s_dt = parse_schedule_time(stn_sched_str, stop.get("day", 1), now_ist.date())
+            s_dt = parse_stop_datetime(stop, journey_start, use_arrival=True)
             if s_dt is not None:
-                if s_dt < now_ist - datetime.timedelta(hours=8):
-                    s_dt += datetime.timedelta(days=1)
-                cand_dt = s_dt + datetime.timedelta(minutes=d_min)
-                stop_eta_dt = max(prev_milestone_dt + datetime.timedelta(minutes=3.0), cand_dt)
+                cand_dt = s_dt + datetime.timedelta(minutes=round(d_min))
+                stop_eta_dt = max(prev_milestone_dt + datetime.timedelta(minutes=2.0), cand_dt)
             else:
                 inter_km = float(stop.get("section_km") or 15.0)
                 inter_mins = (inter_km / 80.0) * 60.0
-                stop_eta_dt = prev_milestone_dt + datetime.timedelta(minutes=max(4.0, inter_mins))
+                stop_eta_dt = prev_milestone_dt + datetime.timedelta(minutes=max(3.0, inter_mins))
             prev_milestone_dt = stop_eta_dt
-            eta_time = stop_eta_dt.strftime("%H:%M")
+            eta_arr = stop_eta_dt.strftime("%H:%M")
+
+            if raw_dep and raw_dep != "None" and idx < len(sim.route_stops) - 1:
+                s_dep_dt = parse_stop_datetime(stop, journey_start, use_arrival=False)
+                if s_dep_dt:
+                    cand_dep = s_dep_dt + datetime.timedelta(minutes=round(dep_d_min))
+                    eta_dep = cand_dep.strftime("%H:%M")
+                else:
+                    eta_dep = eta_arr
+            else:
+                eta_dep = "TERMINAL"
+
+            eta_time = eta_arr
 
         route_progress.append(RouteStop(
             seq=stop["seq"],
@@ -402,11 +616,34 @@ def get_train_eta_endpoint(train_no: str):
             scheduled_departure=stop["departure"],
             delay_min=round(d_min, 1) if d_min is not None else None,
             eta=eta_time,
+            eta_arrival=eta_arr,
+            eta_departure=eta_dep,
+            halt_min=halt_m,
             lat=stop.get("lat"),
             lon=stop.get("lon"),
             is_recovered=is_rec,
             recovered_min=round(rec_amt, 1)
         ))
+
+    min_physical_dt = None
+    if sim.status == "RUNNING" and nxt_stop:
+        rem_sec_km = max(0.0, float(nxt_stop.get("section_km", 20.0)) - float(sim.section_dist_covered_km))
+        phys_min = (rem_sec_km / max(40.0, sim.max_speed_kmh)) * 60.0
+        min_physical_dt = now_ist + datetime.timedelta(minutes=phys_min)
+
+    if not (is_not_running or is_cancelled or is_yet_to_start or is_completed):
+        forecasted_delay, point_eta_dt, lower_eta_dt, upper_eta_dt, route_progress = STABLE_ETA_TRACKER.get_stable_prediction(
+            train_no=sim.train_no,
+            current_stop_idx=state["current_stop_idx"],
+            current_delay_min=curr_delay,
+            candidate_forecast_delay=forecasted_delay,
+            candidate_point_eta_dt=point_eta_dt,
+            candidate_lower_eta_dt=lower_eta_dt,
+            candidate_upper_eta_dt=upper_eta_dt,
+            candidate_route_progress=route_progress,
+            now_ist=now_ist,
+            min_physical_eta_dt=min_physical_dt
+        )
 
     dest_stop_info = recovery_traj[-1] if recovery_traj else {}
     dest_forecast_delay = float(dest_stop_info.get("forecasted_delay_min", 0.0))
@@ -452,7 +689,13 @@ def get_train_eta_endpoint(train_no: str):
         delay_reasons=[DelayReason(**r) for r in reasons_list],
         route_progress=route_progress,
         telemetry_source=SIMULATOR_SOURCE.get(t_no, SIMULATOR_SOURCE.get(sim.train_no, "NTES_REALTIME")),
-        live_position_desc=SIMULATOR_DESC.get(t_no, SIMULATOR_DESC.get(sim.train_no)),
+        live_position_desc=(
+            f"Yet to start from {curr_stn_name} ({curr_stn_code})" if is_yet_to_start else
+            f"Journey completed at {curr_stn_name} ({curr_stn_code})" if is_completed else
+            (f"Departed {curr_stn_name} ({curr_stn_code}) - En route to {nxt_stn_name} ({nxt_stn_code})" if sim.status == "RUNNING" and curr_stn_code != nxt_stn_code else
+             (f"At {curr_stn_name} ({curr_stn_code}) platform" if sim.status == "DWELLING" else
+              SIMULATOR_DESC.get(t_no, SIMULATOR_DESC.get(sim.train_no))))
+        ),
         model_b_stgcn_delta=round(pred_delta_stgcn, 2),
         ensemble_blend_ratio=f"{int(stacking_ensemble.w_lgb * 100)}% LightGBM + {int(stacking_ensemble.w_stgcn * 100)}% ST-GCN",
         dest_delay_recovery_min=round(dest_recovered_min, 1),

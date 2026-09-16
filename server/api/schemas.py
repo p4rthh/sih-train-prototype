@@ -27,6 +27,9 @@ class RouteStop(BaseModel):
     scheduled_departure: Optional[str] = None
     delay_min: Optional[float] = None
     eta: Optional[str] = None
+    eta_arrival: Optional[str] = None
+    eta_departure: Optional[str] = None
+    halt_min: Optional[int] = 0
     lat: Optional[float] = None
     lon: Optional[float] = None
     is_recovered: Optional[bool] = False

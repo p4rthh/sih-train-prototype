@@ -246,8 +246,8 @@ export const LiveTrackMap: React.FC<Props> = ({ lat, lon, speedKmh, stops, train
                 {stops[stops.length - 1]?.station_code || "DEST"}
               </Text>
               <Text style={styles.stationTime}>
-                {stops[stops.length - 1]?.scheduled_arrival && stops[stops.length - 1].scheduled_arrival !== "None"
-                  ? stops[stops.length - 1].scheduled_arrival.slice(0, 5)
+                {stops[stops.length - 1]?.scheduled_arrival && stops[stops.length - 1]?.scheduled_arrival !== "None"
+                  ? stops[stops.length - 1]?.scheduled_arrival?.slice(0, 5)
                   : "END"}
               </Text>
             </View>
