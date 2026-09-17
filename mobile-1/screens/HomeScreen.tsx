@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TextInputProps, TouchableOpacity, View } from 'react-native';
 import { ArrowUpDown, ListTree, MapPin, Route, Search, Train } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, space, stitchColors, stitchRadius, stitchType, type } from '../theme/tokens';
 import { searchStations, searchTrains, searchTrainsBetweenStations } from '../services/api';
@@ -25,12 +26,13 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 // lucide-react-native equivalents for the design's Material Symbols glyphs (train, route, search,
 // radio_button_unchecked, swap_vert, location_on).
 export function HomeScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const goToTrain = (trainNo: string) => navigation.navigate('TrainTabs', { trainNo });
   const goToStation = (code: string) => navigation.navigate('StationSearch', { stationCode: code });
 
   return (
     <View style={styles.ground}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top, height: 60 + insets.top }]}>
         <Text style={styles.wordmark}>Navarail</Text>
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>

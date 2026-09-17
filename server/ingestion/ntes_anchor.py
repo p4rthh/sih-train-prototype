@@ -20,7 +20,7 @@ def prune_ntes_cache():
             NTES_CACHE.pop(k, None)
             NTES_CACHE_TIMESTAMP.pop(k, None)
 
-ntes_client = NTESClient()
+ntes_client = NTESClient(timeout=2, retries=0)
 
 def parse_date_arg(date_str: Optional[str]) -> datetime.date:
     tz_ist = datetime.timezone(datetime.timedelta(hours=5, minutes=30))

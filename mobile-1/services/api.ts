@@ -16,7 +16,11 @@ import Constants from "expo-constants";
 function resolveBackendHost(): string {
   try {
     if (process.env.EXPO_PUBLIC_API_URL) {
-      return process.env.EXPO_PUBLIC_API_URL.trim().replace(/\/+$/, "");
+      let url = process.env.EXPO_PUBLIC_API_URL.trim().replace(/\/+$/, "");
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        url = `https://${url}`;
+      }
+      return url;
     }
 
     const hostUri =
@@ -57,13 +61,20 @@ export const setCustomHost = (newHost: string) => {
 export const getApiBaseUrl = (): string => {
   const host = currentHost.trim();
 
-  // If already a full URL (e.g. https://xxxx.ngrok-free.app)
+  // If already a full URL (e.g. https://xxxx.up.railway.app)
   if (host.startsWith("http://") || host.startsWith("https://")) {
     return host;
   }
 
-  // If it's an ngrok or public tunnel domain without protocol
-  if (host.includes("ngrok") || host.includes("loca.lt") || host.includes("trycloudflare.com")) {
+  // If it's a cloud domain without protocol
+  if (
+    host.includes("railway.app") ||
+    host.includes("onrender.com") ||
+    host.includes("ngrok") ||
+    host.includes("loca.lt") ||
+    host.includes("trycloudflare.com") ||
+    host.includes("fly.dev")
+  ) {
     return `https://${host}`;
   }
 

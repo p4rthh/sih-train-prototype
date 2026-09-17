@@ -32,9 +32,14 @@ import type { RootStackParamList } from './navigation/types';
 // UI_NOTES.md). Re-applying that same auto-detected host with the correct port here means the
 // app just works out of the box; the hamburger-menu config modal is still there for anyone who
 // needs to point at a different machine or a tunnel, it's just no longer required for the common
-// case.
-const BACKEND_PORT = '8000';
-setCustomHost(`${getActiveHost()}:${BACKEND_PORT}`);
+const activeHost = getActiveHost();
+if (
+  !activeHost.startsWith('http://') &&
+  !activeHost.startsWith('https://') &&
+  !activeHost.includes(':')
+) {
+  setCustomHost(`${activeHost}:8000`);
+}
 
 import { SplashScreen as BrandSplashScreen } from './screens/SplashScreen';
 import { LocationPermissionScreen } from './screens/LocationPermissionScreen';

@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Bell, ChartColumn, MapPin, Train } from 'lucide-react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -31,11 +32,12 @@ type Props = NativeStackScreenProps<RootStackParamList, 'TrainTabs'>;
 
 export function TrainTabsScreen({ route, navigation }: Props) {
   const { trainNo } = route.params;
+  const insets = useSafeAreaInsets();
 
   return (
     <TrainInstanceProvider trainNo={trainNo}>
       <View style={styles.ground}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top, height: 56 + insets.top }]}>
           <TouchableOpacity onPress={navigation.goBack} style={styles.backBtn}>
             <ArrowLeft size={20} color={colors.pinkDeep} />
           </TouchableOpacity>
@@ -51,7 +53,10 @@ export function TrainTabsScreen({ route, navigation }: Props) {
               tabBarLabel: TAB_LABELS[name],
               tabBarActiveTintColor: colors.pinkDeep,
               tabBarInactiveTintColor: colors.maroonMuted,
-              tabBarStyle: styles.tabBar,
+              tabBarStyle: [
+                styles.tabBar,
+                { paddingBottom: Math.max(space.xs, insets.bottom), height: 58 + insets.bottom },
+              ],
               tabBarLabelStyle: styles.tabLabel,
               tabBarIcon: ({ focused, color }) => (
                 <View style={[styles.tabIconWrap, focused && styles.tabIconWrapActive]}>
