@@ -37,9 +37,30 @@ export interface RouteStop {
   recovered_min?: number;
 }
 
+export interface TrainInstanceSummary {
+  instance_id: string;
+  train_no: string;
+  start_date: string;
+  start_date_display: string;
+  label: string;
+  is_today: boolean;
+  run_status: "RUNNING" | "DWELLING" | "YET_TO_START" | "COMPLETED" | "NOT_RUNNING_TODAY" | "CANCELLED" | string;
+  current_station_code: string;
+  current_station_name: string;
+  next_station_code?: string | null;
+  next_station_name?: string | null;
+  current_delay_min: number;
+  speed_kmh: number;
+  position_desc?: string | null;
+}
+
 export interface ETAResponse {
   train_no: string;
   train_name: string;
+  instance_id?: string;
+  start_date?: string;
+  start_date_label?: string;
+  active_instances?: TrainInstanceSummary[];
   run_status?: "RUNNING" | "YET_TO_START" | "COMPLETED" | "NOT_RUNNING_TODAY" | "CANCELLED";
   current_station_code: string;
   current_station_name: string;
@@ -103,3 +124,17 @@ export interface PNRResponse {
   chart_prepared: boolean;
   source: string;
 }
+
+export interface RouteSearchResultItem {
+  train_number: string;
+  train_name: string;
+  from_station_code: string;
+  from_station_name: string;
+  from_departure: string;
+  to_station_code: string;
+  to_station_name: string;
+  to_arrival: string;
+  duration: string;
+  stop_count: number;
+}
+

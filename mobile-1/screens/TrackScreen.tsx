@@ -4,7 +4,7 @@ import { Check, Map as MapIcon, MapPin, Navigation, X, Zap } from 'lucide-react-
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { LiveMap } from '../components/ui/LiveMap';
 import { colors, radius, space, type } from '../theme/tokens';
-import { useTrainStream } from '../hooks/useTrainStream';
+import { useTrainInstance } from '../context/TrainInstanceContext';
 import type { RouteStop } from '../types';
 import type { TrainTabsParamList } from '../navigation/types';
 
@@ -45,14 +45,24 @@ const calcActualTime = (schedStr?: string, delayMin?: number): string => {
 
 export function TrackScreen({ route }: Props) {
   const { trainNo } = route.params;
-  const { data } = useTrainStream(trainNo);
+  const { data, error, refresh } = useTrainInstance();
   const [tracking, setTracking] = useState(true);
   const [showMap, setShowMap] = useState(false);
 
   if (!data) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color={colors.pinkDeep} size="large" />
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorTitle}>Unable to Load Route Progress</Text>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+              <Text style={styles.retryButtonText}>Retry Connection</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <ActivityIndicator color={colors.pinkDeep} size="large" />
+        )}
       </View>
     );
   }
@@ -958,5 +968,32 @@ const styles = StyleSheet.create({
   speedUnit: {
     ...type.micro,
     color: colors.maroonMuted,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    paddingHorizontal: space.lg,
+  },
+  errorTitle: {
+    ...type.h2,
+    fontSize: 16,
+    color: colors.ink,
+    marginBottom: space.xs,
+  },
+  errorText: {
+    ...type.body,
+    fontSize: 13,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    marginBottom: space.md,
+  },
+  retryButton: {
+    backgroundColor: colors.pinkDeep,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: radius.md,
+  },
+  retryButtonText: {
+    ...type.label,
+    color: colors.white,
   },
 });

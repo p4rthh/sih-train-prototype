@@ -8,6 +8,7 @@ import { TrainDetailScreen } from '../screens/TrainDetailScreen';
 import { TrackScreen } from '../screens/TrackScreen';
 import { BehaviorScreen } from '../screens/BehaviorScreen';
 import { AlertsScreen } from '../screens/AlertsScreen';
+import { TrainInstanceProvider } from '../context/TrainInstanceContext';
 import type { RootStackParamList, TrainTabsParamList } from './types';
 
 const Tab = createBottomTabNavigator<TrainTabsParamList>();
@@ -28,50 +29,45 @@ const TAB_LABELS: Record<keyof TrainTabsParamList, string> = {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TrainTabs'>;
 
-// Matches the bottom nav bar shared across train_overview.html/itinerary.html/
-// train_behavior.html/alerts.html: the active tab gets a pink pill-bubble icon, inactive tabs
-// stay plain gray. Uses the library's own tabBarIcon/tabBarLabel customization points rather
-// than a fully custom `tabBar` render prop — an earlier custom-tabBar version left the bar
-// fighting the screen content for vertical space on web (found via DOM inspection: the tab
-// bar's own DOM node was correctly laid out, but screen content rendered on top of it instead
-// of beside it), which the standard per-screen options path avoids.
 export function TrainTabsScreen({ route, navigation }: Props) {
   const { trainNo } = route.params;
 
   return (
-    <View style={styles.ground}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={navigation.goBack} style={styles.backBtn}>
-          <ArrowLeft size={20} color={colors.pinkDeep} />
-        </TouchableOpacity>
-        <Text style={styles.wordmark}>navarail</Text>
-        <View style={styles.backBtn} />
+    <TrainInstanceProvider trainNo={trainNo}>
+      <View style={styles.ground}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={navigation.goBack} style={styles.backBtn}>
+            <ArrowLeft size={20} color={colors.pinkDeep} />
+          </TouchableOpacity>
+          <Text style={styles.wordmark}>navarail</Text>
+          <View style={styles.backBtn} />
+        </View>
+        <Tab.Navigator
+          screenOptions={({ route: r }) => {
+            const name = r.name as keyof TrainTabsParamList;
+            const Icon = TAB_ICONS[name];
+            return {
+              headerShown: false,
+              tabBarLabel: TAB_LABELS[name],
+              tabBarActiveTintColor: colors.pinkDeep,
+              tabBarInactiveTintColor: colors.maroonMuted,
+              tabBarStyle: styles.tabBar,
+              tabBarLabelStyle: styles.tabLabel,
+              tabBarIcon: ({ focused, color }) => (
+                <View style={[styles.tabIconWrap, focused && styles.tabIconWrapActive]}>
+                  <Icon size={16} color={focused ? colors.white : color} />
+                </View>
+              ),
+            };
+          }}
+        >
+          <Tab.Screen name="TrainView" component={TrainDetailScreen} initialParams={{ trainNo }} />
+          <Tab.Screen name="Track" component={TrackScreen} initialParams={{ trainNo }} />
+          <Tab.Screen name="Behavior" component={BehaviorScreen} initialParams={{ trainNo }} />
+          <Tab.Screen name="Alerts" component={AlertsScreen} initialParams={{ trainNo }} />
+        </Tab.Navigator>
       </View>
-      <Tab.Navigator
-        screenOptions={({ route: r }) => {
-          const name = r.name as keyof TrainTabsParamList;
-          const Icon = TAB_ICONS[name];
-          return {
-            headerShown: false,
-            tabBarLabel: TAB_LABELS[name],
-            tabBarActiveTintColor: colors.pinkDeep,
-            tabBarInactiveTintColor: colors.maroonMuted,
-            tabBarStyle: styles.tabBar,
-            tabBarLabelStyle: styles.tabLabel,
-            tabBarIcon: ({ focused, color }) => (
-              <View style={[styles.tabIconWrap, focused && styles.tabIconWrapActive]}>
-                <Icon size={16} color={focused ? colors.white : color} />
-              </View>
-            ),
-          };
-        }}
-      >
-        <Tab.Screen name="TrainView" component={TrainDetailScreen} initialParams={{ trainNo }} />
-        <Tab.Screen name="Track" component={TrackScreen} initialParams={{ trainNo }} />
-        <Tab.Screen name="Behavior" component={BehaviorScreen} initialParams={{ trainNo }} />
-        <Tab.Screen name="Alerts" component={AlertsScreen} initialParams={{ trainNo }} />
-      </Tab.Navigator>
-    </View>
+    </TrainInstanceProvider>
   );
 }
 

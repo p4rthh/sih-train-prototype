@@ -3,28 +3,45 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { Clock } from 'lucide-react-native';
 import { colors, radius, space, type } from '../theme/tokens';
-import { useTrainStream } from '../hooks/useTrainStream';
+import { useTrainInstance } from '../context/TrainInstanceContext';
 import type { TrainTabsParamList } from '../navigation/types';
+import type { TrainInstanceSummary } from '../types';
+
+function formatInstanceDate(inst: TrainInstanceSummary): string {
+  try {
+    const parts = inst.start_date.split('-');
+    if (parts.length === 3) {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const day = parseInt(parts[2], 10);
+      const month = months[parseInt(parts[1], 10) - 1];
+      return `Started ${day} ${month}${inst.is_today ? ' (Today)' : ''}`;
+    }
+  } catch {}
+  return inst.start_date_display || `Started ${inst.start_date}`;
+}
 
 type Props = BottomTabScreenProps<TrainTabsParamList, 'TrainView'>;
 
-// Rebuilt from the Stitch project's train_overview.html — this one (and itinerary.html,
-// livemap.html) reuse the Figma-mined palette directly (that file's own tailwind config points
-// brand.primary/page/bg at the exact same crimson/cream/pink hexes already in `colors` below),
-// so this screen uses the existing `colors` tokens rather than the separate `stitchColors` added
-// for Home/Behavior/Alerts. The shared "navarail" header + back button live one level up in
-// navigation/TrainTabsScreen.tsx, matching the reference where the header never changes when
-// switching tabs.
 export function TrainDetailScreen({ route }: Props) {
   const { trainNo } = route.params;
-  const { data } = useTrainStream(trainNo);
+  const { selectedStartDate, setSelectedStartDate, data, error, refresh } = useTrainInstance();
   const [showReasons, setShowReasons] = useState(true);
 
   return (
     <View style={styles.ground}>
       {!data ? (
         <View style={styles.centered}>
-          <ActivityIndicator color={colors.pinkDeep} size="large" />
+          {error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorTitle}>Unable to Load Live Telemetry</Text>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+                <Text style={styles.retryButtonText}>Retry Connection</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <ActivityIndicator color={colors.pinkDeep} size="large" />
+          )}
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.body}>
@@ -56,7 +73,47 @@ export function TrainDetailScreen({ route }: Props) {
                 <Text style={styles.statSub}>km/hr</Text>
               </View>
             </View>
+            {data.live_position_desc ? (
+              <View style={styles.liveDescWrap}>
+                <View style={styles.pulseDotSm} />
+                <Text style={styles.liveDescText} numberOfLines={2}>
+                  {data.live_position_desc}
+                </Text>
+              </View>
+            ) : null}
           </View>
+
+          {/* Simple Instance Switcher */}
+          {data.active_instances && data.active_instances.length > 1 && (
+            <View style={styles.instanceSwitchBar}>
+              {data.active_instances.map((inst) => {
+                const isSelected = selectedStartDate
+                  ? inst.start_date === selectedStartDate
+                  : inst.start_date === data.start_date;
+                return (
+                  <TouchableOpacity
+                    key={inst.instance_id}
+                    style={[
+                      styles.instanceTab,
+                      isSelected && styles.instanceTabActive,
+                    ]}
+                    onPress={() => setSelectedStartDate(inst.start_date)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.instanceTabText,
+                        isSelected && styles.instanceTabTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {formatInstanceDate(inst)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
           <View style={styles.card}>
             <View style={styles.rowBetween}>
@@ -407,5 +464,81 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.inkMuted,
     marginTop: 2,
+  },
+  liveDescWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    marginTop: space.sm,
+    paddingTop: space.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  pulseDotSm: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.pinkDeep,
+  },
+  liveDescText: {
+    ...type.micro,
+    fontSize: 10,
+    color: colors.inkMuted,
+    flex: 1,
+  },
+  instanceSwitchBar: {
+    flexDirection: 'row',
+    backgroundColor: colors.cream,
+    borderRadius: radius.pill,
+    padding: space.xs,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  instanceTab: {
+    flex: 1,
+    paddingVertical: space.sm + 2,
+    paddingHorizontal: space.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.pill,
+  },
+  instanceTabActive: {
+    backgroundColor: colors.pinkDeep,
+  },
+  instanceTabText: {
+    ...type.label,
+    fontSize: 12,
+    letterSpacing: 0,
+    color: colors.maroonMuted,
+  },
+  instanceTabTextActive: {
+    color: colors.white,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    paddingHorizontal: space.lg,
+  },
+  errorTitle: {
+    ...type.h2,
+    fontSize: 16,
+    color: colors.ink,
+    marginBottom: space.xs,
+  },
+  errorText: {
+    ...type.body,
+    fontSize: 13,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    marginBottom: space.md,
+  },
+  retryButton: {
+    backgroundColor: colors.pinkDeep,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: radius.md,
+  },
+  retryButtonText: {
+    ...type.label,
+    color: colors.white,
   },
 });

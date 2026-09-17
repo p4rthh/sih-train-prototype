@@ -83,5 +83,5 @@ def resolve_pnr_status(pnr_number: str) -> Optional[Dict[str, Any]]:
             }
         ],
         "chart_prepared": True,
-        "source": "VERIFIED_IRCTC_RECORD"
+        "source": "SIMULATED_FALLBACK"
     }

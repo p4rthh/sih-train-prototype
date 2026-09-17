@@ -30,13 +30,14 @@ OPEN_METEO_ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 
 def get_train_priority(train_no: str, train_name: str = "") -> int:
     name_upper = train_name.upper()
+    tokens = set(name_upper.replace("-", " ").replace("/", " ").split())
     if any(k in name_upper for k in ["VANDE BHARAT", "RAJDHANI", "SHATABDI", "TEJAS", "DURONTO"]):
         return 1
-    if any(k in name_upper for k in ["SAMPARK KRANTI", "HUMSAFAR", "SUPERFAST", "SF"]):
+    if any(k in name_upper for k in ["SAMPARK KRANTI", "HUMSAFAR", "SUPERFAST"]) or "SF" in tokens:
         return 2
     if any(k in name_upper for k in ["GARIB RATH", "JAN SHATABDI"]):
         return 4
-    if any(k in name_upper for k in ["PASSENGER", "MEMU", "DEMU", "LOCAL"]):
+    if any(k in name_upper for k in ["PASSENGER", "MEMU", "DEMU", "LOCAL", "SHUTTLE"]):
         return 5
     if any(k in name_upper for k in ["GOODS", "FREIGHT"]):
         return 6

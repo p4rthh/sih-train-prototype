@@ -159,7 +159,12 @@ class FeaturePipeline:
 
         # Seasonal and calendar factors
         is_monsoon = 1 if dt.month in [6, 7, 8, 9] else 0
-        is_holiday = 1 if (dow >= 5 or dt.month in [10, 11]) else 0
+        MAJOR_INDIAN_HOLIDAYS = {
+            (1, 26), (3, 14), (3, 15), (4, 11), (8, 15), (10, 2),
+            (10, 20), (10, 21), (10, 22), (10, 23), (10, 24),
+            (11, 1), (11, 2), (11, 3), (11, 4), (11, 7), (11, 8), (12, 25)
+        }
+        is_holiday = 1 if (dow >= 5 or (dt.month, dt.day) in MAJOR_INDIAN_HOLIDAYS) else 0
 
         # Train number hash
         try:
@@ -180,6 +185,17 @@ class FeaturePipeline:
         if track_cap not in [1, 2, 3, 4]:
             track_cap = 1 if "SINGLE" in curr_stn_name else 2
 
+        # Punctuality normalization
+        raw_on_time = profile.get("historical_on_time_pct", profile.get("punctuality", 80.0))
+        try:
+            val_f = float(raw_on_time)
+            hist_on_time_norm = val_f / 100.0 if val_f > 1.0 else val_f
+        except Exception:
+            hist_on_time_norm = 0.80
+
+        # Halt recovery dwell buffer vs section running slack
+        halt_dwell_slack = max(0.0, sched_dwell - (2.0 if sched_dwell <= 5.0 else 5.0))
+
         row = {
             "current_delay_min": curr_delay,
             "lag_delay_1": lag_1,
@@ -192,7 +208,7 @@ class FeaturePipeline:
             "max_permitted_speed": max_speed,
             "train_priority": priority,
             "sched_dwell_min": sched_dwell,
-            "recovery_slack_min": round(calculated_slack, 2),
+            "recovery_slack_min": round(halt_dwell_slack, 2),
             "trip_progress_ratio": progress_ratio,
             "is_origin_station": 1 if stop_idx == 0 else 0,
             "tod_sin": tod_sin,
@@ -209,7 +225,7 @@ class FeaturePipeline:
             "hist_recovery_rate": float(profile.get("recovery_rate") or profile.get("median_recovery_rate", 0.70)),
             "is_overnight_recovery_window": is_overnight,
             "dist_to_destination_km": rem_dist,
-            "hist_on_time_pct": float(profile.get("punctuality") or (profile.get("historical_on_time_pct", 80.0) / 100.0 if profile.get("historical_on_time_pct", 80.0) > 1.0 else profile.get("historical_on_time_pct", 0.80))),
+            "hist_on_time_pct": round(hist_on_time_norm, 3),
             "section_slack_min": round(calculated_slack, 2),
             "cumulative_delay_min": cum_delay,
             "stops_remaining": stops_remaining,

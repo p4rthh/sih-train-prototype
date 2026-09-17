@@ -2,12 +2,13 @@ import datetime
 from typing import List, Dict, Any, Optional, Tuple
 from fastapi import APIRouter, HTTPException, Query
 
+from server.config import get_train_priority
 from server.database import (
     search_trains, get_train_schedule, get_db_connection, find_trains_between_stations,
     search_stations, resolve_station_code, TRAIN_ALIASES
 )
 from server.ingestion.weather_client import WeatherClient
-from server.ingestion.ntes_anchor import get_live_ntes_anchor
+from server.ingestion.ntes_anchor import get_live_ntes_anchor, parse_date_arg, get_active_ntes_instances
 from server.ingestion.pnr_resolver import resolve_pnr_status
 from server.simulator.kinematic_engine import TrainSimulator
 from server.features.pipeline import FeaturePipeline
@@ -21,7 +22,7 @@ from server.ingestion.historical_profiles import HistoricalProfileManager
 from server.api.schemas import (
     TrainSearchResult, ETAResponse, DynamicETA, ConfidenceInterval,
     DelayReason, RouteStop, StationBoardItem, RouteSearchResultItem,
-    StationSearchResult, PNRResponse
+    StationSearchResult, PNRResponse, TrainInstanceSummary
 )
 
 router = APIRouter(prefix="/api", tags=["Train & ETA"])
@@ -38,9 +39,29 @@ SIMULATOR_LAST_TICK: Dict[str, datetime.datetime] = {}
 SIMULATOR_SOURCE: Dict[str, str] = {}
 SIMULATOR_DESC: Dict[str, Optional[str]] = {}
 
+MAX_ACTIVE_SIMULATORS = 150
+
+def prune_simulators_if_needed():
+    if len(ACTIVE_SIMULATORS) > MAX_ACTIVE_SIMULATORS:
+        sorted_keys = sorted(
+            SIMULATOR_LAST_TICK.keys(),
+            key=lambda k: SIMULATOR_LAST_TICK.get(k, datetime.datetime.min.replace(tzinfo=datetime.timezone.utc))
+        )
+        for k in sorted_keys[:50]:
+            ACTIVE_SIMULATORS.pop(k, None)
+            SIMULATOR_LAST_TICK.pop(k, None)
+            SIMULATOR_SOURCE.pop(k, None)
+            SIMULATOR_DESC.pop(k, None)
+
 class StableETATracker:
     def __init__(self):
         self._cache: Dict[str, Dict[str, Any]] = {}
+
+    def _prune_cache_if_needed(self):
+        if len(self._cache) > 250:
+            sorted_keys = sorted(self._cache.keys(), key=lambda k: self._cache[k].get("last_update", datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)))
+            for k in sorted_keys[:75]:
+                self._cache.pop(k, None)
 
     def get_stable_prediction(
         self,
@@ -57,6 +78,7 @@ class StableETATracker:
     ) -> Tuple[float, datetime.datetime, datetime.datetime, datetime.datetime, List[RouteStop]]:
         cached = self._cache.get(train_no)
         if not cached:
+            self._prune_cache_if_needed()
             entry = {
                 "stop_idx": current_stop_idx,
                 "ntes_delay": current_delay_min,
@@ -140,6 +162,8 @@ def parse_schedule_time(time_str: Optional[str], day_offset: int = 1, base_date:
         return None
 
 def get_journey_start_date(sim: TrainSimulator, now_ist: datetime.datetime) -> datetime.date:
+    if getattr(sim, "start_date", None):
+        return sim.start_date
     if sim.status in ["YET_TO_START", "NOT_RUNNING_TODAY", "CANCELLED"]:
         return now_ist.date()
 
@@ -190,50 +214,58 @@ def parse_stop_datetime(stop: Dict[str, Any], journey_start_date: datetime.date,
         return None
 
 
-def get_or_create_simulator(train_no: str) -> TrainSimulator:
+def get_or_create_simulator(train_no: str, start_date: Optional[datetime.date] = None) -> Tuple[TrainSimulator, str, datetime.date]:
     raw_no = str(train_no).strip()
     t_no = TRAIN_ALIASES.get(raw_no, raw_no)
     now_ist = datetime.datetime.now(IST)
 
-    if t_no not in ACTIVE_SIMULATORS:
+    if start_date is None:
+        start_date = now_ist.date()
+
+    date_str = start_date.strftime("%Y-%m-%d")
+    instance_key = f"{t_no}_{date_str}"
+
+    if instance_key not in ACTIVE_SIMULATORS:
+        prune_simulators_if_needed()
         schedule = get_train_schedule(t_no)
         if not schedule:
             raise HTTPException(status_code=404, detail=f"Train #{raw_no} schedule not found in database")
-        
-        sim = TrainSimulator(t_no, schedule)
 
-        anchor = get_live_ntes_anchor(t_no)
+        sim = TrainSimulator(t_no, schedule, start_date=start_date)
+
+        anchor = get_live_ntes_anchor(t_no, start_date_str=date_str)
         if anchor:
             run_st = anchor.get("run_status", "RUNNING")
             stn = anchor.get("last_station_code") or sim.route_stops[0]["station_code"]
             nxt_stn = anchor.get("next_station_code")
             del_m = float(anchor.get("current_delay_min") or 0.0)
             sim.anchor_to_ntes(stn, del_m, run_status=run_st, next_station_code=nxt_stn)
-            SIMULATOR_SOURCE[t_no] = "NTES_REALTIME"
-            SIMULATOR_DESC[t_no] = anchor.get("position_desc") or f"Live at {stn} (+{int(del_m)}m delay)"
+            SIMULATOR_SOURCE[instance_key] = "NTES_REALTIME"
+            SIMULATOR_DESC[instance_key] = anchor.get("position_desc") or f"Live at {stn} (+{int(del_m)}m delay)"
         else:
             sim.sync_to_current_time()
-            SIMULATOR_SOURCE[t_no] = "SCHEDULE_REALTIME"
+            SIMULATOR_SOURCE[instance_key] = "SCHEDULE_REALTIME"
             if sim.status == "YET_TO_START":
                 dep_t = sim.route_stops[0].get("departure") or "--:--"
                 stn_n = sim.route_stops[0]["station_name"]
-                SIMULATOR_DESC[t_no] = f"Yet to start from {stn_n} (Scheduled departure: {dep_t})"
+                SIMULATOR_DESC[instance_key] = f"Yet to start from {stn_n} (Scheduled departure: {dep_t})"
             elif sim.status == "COMPLETED":
                 arr_t = sim.route_stops[-1].get("arrival") or "--:--"
                 stn_n = sim.route_stops[-1]["station_name"]
-                SIMULATOR_DESC[t_no] = f"Journey completed at {stn_n} (Scheduled arrival: {arr_t})"
+                SIMULATOR_DESC[instance_key] = f"Journey completed at {stn_n} (Scheduled arrival: {arr_t})"
             else:
-                SIMULATOR_DESC[t_no] = "Synchronized to timetable operational schedule"
+                SIMULATOR_DESC[instance_key] = "Synchronized to timetable operational schedule"
 
-        ACTIVE_SIMULATORS[t_no] = sim
-        SIMULATOR_LAST_TICK[t_no] = now_ist
-        return sim
+        ACTIVE_SIMULATORS[instance_key] = sim
+        SIMULATOR_LAST_TICK[instance_key] = now_ist
+        return sim, instance_key, start_date
 
-    sim = ACTIVE_SIMULATORS[t_no]
-    last_tick = SIMULATOR_LAST_TICK.get(t_no, now_ist)
+    sim = ACTIVE_SIMULATORS[instance_key]
+    last_tick = SIMULATOR_LAST_TICK.get(instance_key, now_ist)
     elapsed_sec = max(1.0, min(120.0, (now_ist - last_tick).total_seconds()))
+    SIMULATOR_LAST_TICK[instance_key] = now_ist
 
-    anchor = get_live_ntes_anchor(t_no)
+    anchor = get_live_ntes_anchor(t_no, start_date_str=date_str)
     if anchor:
         run_st = anchor.get("run_status", "RUNNING")
         stn = (anchor.get("last_station_code") or sim.route_stops[0]["station_code"]).strip().upper()
@@ -242,8 +274,8 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
         last_stn = getattr(sim, "last_anchored_ntes_station", None)
         if last_stn != stn or sim.status != run_st or abs(sim.current_delay_min - del_m) >= 2.0:
             sim.anchor_to_ntes(stn, del_m, run_status=run_st, next_station_code=nxt_stn)
-            SIMULATOR_SOURCE[t_no] = "NTES_REALTIME"
-            SIMULATOR_DESC[t_no] = anchor.get("position_desc") or f"Live at {stn} (+{int(del_m)}m delay)"
+            SIMULATOR_SOURCE[instance_key] = "NTES_REALTIME"
+            SIMULATOR_DESC[instance_key] = anchor.get("position_desc") or f"Live at {stn} (+{int(del_m)}m delay)"
         else:
             sim.current_delay_min = del_m
             if sim.delay_history:
@@ -258,8 +290,7 @@ def get_or_create_simulator(train_no: str) -> TrainSimulator:
     else:
         sim.current_speed_kmh = 0.0
 
-    SIMULATOR_LAST_TICK[t_no] = now_ist
-    return sim
+    return sim, instance_key, start_date
 
 
 @router.get("/trains/search", response_model=List[TrainSearchResult])
@@ -304,12 +335,62 @@ def get_schedule_endpoint(train_no: str):
         "stops": schedule
     }
 
-@router.get("/train/{train_no}/eta", response_model=ETAResponse)
-def get_train_eta_endpoint(train_no: str):
+@router.get("/train/{train_no}/instances", response_model=List[TrainInstanceSummary])
+def get_train_instances_endpoint(train_no: str):
     raw_no = str(train_no).strip()
     t_no = TRAIN_ALIASES.get(raw_no, raw_no)
-    sim = get_or_create_simulator(t_no)
+    schedule = get_train_schedule(t_no)
+    if not schedule:
+        raise HTTPException(status_code=404, detail=f"Train #{raw_no} schedule not found in database")
+    instances = get_active_ntes_instances(raw_no, schedule)
+    return [TrainInstanceSummary(**i) for i in instances]
+
+@router.get("/train/{train_no}/eta", response_model=ETAResponse)
+def get_train_eta_endpoint(train_no: str, start_date: Optional[str] = None):
+    raw_no = str(train_no).strip()
+    t_no = TRAIN_ALIASES.get(raw_no, raw_no)
+    schedule = get_train_schedule(t_no)
+    if not schedule:
+        raise HTTPException(status_code=404, detail=f"Train #{raw_no} schedule not found in database")
+
+    active_instances_raw = get_active_ntes_instances(raw_no, schedule)
+    active_instances = [TrainInstanceSummary(**i) for i in active_instances_raw]
+
+    valid_start_date: Optional[str] = None
+    if isinstance(start_date, str) and start_date.strip():
+        valid_start_date = start_date.strip()
+
+    resolved_date: datetime.date
+    if valid_start_date:
+        parsed = parse_date_arg(valid_start_date)
+        resolved_date = parsed if parsed else datetime.datetime.now(IST).date()
+    else:
+        running_inst = next((i for i in active_instances if i.run_status in ["RUNNING", "DWELLING"]), None)
+        if running_inst:
+            parsed_running = parse_date_arg(running_inst.start_date)
+            resolved_date = parsed_running if parsed_running else datetime.datetime.now(IST).date()
+        else:
+            today_inst = next((i for i in active_instances if i.is_today), None)
+            if today_inst:
+                parsed_today = parse_date_arg(today_inst.start_date)
+                resolved_date = parsed_today if parsed_today else datetime.datetime.now(IST).date()
+            elif active_instances:
+                parsed_first = parse_date_arg(active_instances[0].start_date)
+                resolved_date = parsed_first if parsed_first else datetime.datetime.now(IST).date()
+            else:
+                resolved_date = datetime.datetime.now(IST).date()
+
+    sim, instance_key, resolved_date = get_or_create_simulator(t_no, start_date=resolved_date)
     state = sim.get_state()
+    anchor = get_live_ntes_anchor(t_no, start_date_str=resolved_date.strftime("%Y-%m-%d"))
+
+    today_date = datetime.datetime.now(IST).date()
+    if resolved_date == today_date:
+        start_date_label = f"Started Today ({resolved_date.strftime('%d %b')})"
+    elif resolved_date == today_date - datetime.timedelta(days=1):
+        start_date_label = f"Started Yesterday ({resolved_date.strftime('%d %b')})"
+    else:
+        start_date_label = f"Started {resolved_date.strftime('%d %b')}"
 
     stn_code = state["current_station_code"]
     weather = weather_client.get_weather(stn_code, state["lat"], state["lon"])
@@ -330,7 +411,7 @@ def get_train_eta_endpoint(train_no: str):
         forecasted_delay = 0.0
         window_lower_min = 0.0
         window_upper_min = 0.0
-        desc_text = SIMULATOR_DESC.get(t_no) or "Train is not scheduled to run today on Indian Railways network"
+        desc_text = SIMULATOR_DESC.get(instance_key) or "Train is not scheduled to run today on Indian Railways network"
         reasons_list = [{
             "reason": desc_text,
             "severity": "LOW",
@@ -341,7 +422,7 @@ def get_train_eta_endpoint(train_no: str):
         forecasted_delay = 0.0
         window_lower_min = 0.0
         window_upper_min = 0.0
-        desc_text = SIMULATOR_DESC.get(t_no) or "Train service cancelled by Indian Railways"
+        desc_text = SIMULATOR_DESC.get(instance_key) or "Train service cancelled by Indian Railways"
         reasons_list = [{
             "reason": desc_text,
             "severity": "HIGH",
@@ -377,7 +458,8 @@ def get_train_eta_endpoint(train_no: str):
                 state["current_stop_idx"],
                 state["delay_history"],
                 weather,
-                priority_rank=state.get("priority_rank", 2)
+                priority_rank=state.get("priority_rank", 2),
+                train_no=sim.train_no
             )
         else:
             pred_delta_stgcn = pred_delta_lgb
@@ -418,7 +500,7 @@ def get_train_eta_endpoint(train_no: str):
 
     priority_rank = state.get("priority_rank", 2)
     hist_profile = HistoricalProfileManager.get_profile(sim.train_no, priority_rank)
-    has_live = bool(SIMULATOR_SOURCE.get(t_no) == "NTES_REALTIME" or anchor is not None)
+    has_live = bool(SIMULATOR_SOURCE.get(instance_key) == "NTES_REALTIME" or anchor is not None)
     recovery_traj = HistoricalRecoveryEngine.compute_corridor_recovery_trajectory(
         train_no=sim.train_no,
         priority_rank=priority_rank,
@@ -633,7 +715,7 @@ def get_train_eta_endpoint(train_no: str):
 
     if not (is_not_running or is_cancelled or is_yet_to_start or is_completed):
         forecasted_delay, point_eta_dt, lower_eta_dt, upper_eta_dt, route_progress = STABLE_ETA_TRACKER.get_stable_prediction(
-            train_no=sim.train_no,
+            train_no=instance_key,
             current_stop_idx=state["current_stop_idx"],
             current_delay_min=curr_delay,
             candidate_forecast_delay=forecasted_delay,
@@ -668,6 +750,10 @@ def get_train_eta_endpoint(train_no: str):
     return ETAResponse(
         train_no=raw_no,
         train_name=sim.train_name,
+        instance_id=instance_key,
+        start_date=resolved_date.strftime("%Y-%m-%d"),
+        start_date_label=start_date_label,
+        active_instances=active_instances,
         run_status=sim.status,
         current_station_code=curr_stn_code,
         current_station_name=curr_stn_name,
@@ -688,13 +774,13 @@ def get_train_eta_endpoint(train_no: str):
         ),
         delay_reasons=[DelayReason(**r) for r in reasons_list],
         route_progress=route_progress,
-        telemetry_source=SIMULATOR_SOURCE.get(t_no, SIMULATOR_SOURCE.get(sim.train_no, "NTES_REALTIME")),
+        telemetry_source=SIMULATOR_SOURCE.get(instance_key, "NTES_REALTIME"),
         live_position_desc=(
             f"Yet to start from {curr_stn_name} ({curr_stn_code})" if is_yet_to_start else
             f"Journey completed at {curr_stn_name} ({curr_stn_code})" if is_completed else
             (f"Departed {curr_stn_name} ({curr_stn_code}) - En route to {nxt_stn_name} ({nxt_stn_code})" if sim.status == "RUNNING" and curr_stn_code != nxt_stn_code else
              (f"At {curr_stn_name} ({curr_stn_code}) platform" if sim.status == "DWELLING" else
-              SIMULATOR_DESC.get(t_no, SIMULATOR_DESC.get(sim.train_no))))
+              SIMULATOR_DESC.get(instance_key, "Operational run")))
         ),
         model_b_stgcn_delta=round(pred_delta_stgcn, 2),
         ensemble_blend_ratio=f"{int(stacking_ensemble.w_lgb * 100)}% LightGBM + {int(stacking_ensemble.w_stgcn * 100)}% ST-GCN",
@@ -733,10 +819,32 @@ def get_station_board_endpoint(station_code: str, express_only: bool = Query(Tru
 
     items = []
     for idx, r in enumerate(rows):
+        t_no = str(r["train_number"]).strip()
         sched_time = r["departure"] if r["departure"] and r["departure"] != "None" else (r["arrival"] or "12:00:00")
         sched_dt = parse_schedule_time(sched_time, 1, now_ist.date())
-        sim_delay = 14.0 if idx % 3 == 1 else (28.0 if idx % 5 == 2 else 0.0)
-        
+
+        instance_key = f"{t_no}_{now_ist.strftime('%Y-%m-%d')}"
+        sim_delay: float = 0.0
+
+        if instance_key in ACTIVE_SIMULATORS:
+            sim_delay = float(ACTIVE_SIMULATORS[instance_key].current_delay_min)
+        else:
+            anchor = get_live_ntes_anchor(t_no)
+            if anchor and anchor.get("run_status") in ["RUNNING", "DWELLING"]:
+                sim_delay = float(anchor.get("current_delay_min") or 0.0)
+            elif anchor and anchor.get("run_status") in ["YET_TO_START", "COMPLETED"]:
+                sim_delay = float(anchor.get("current_delay_min") or 0.0) if anchor.get("run_status") == "COMPLETED" else 0.0
+            else:
+                p_rank = get_train_priority(t_no, r["train_name"] or "")
+                profile = HistoricalProfileManager.get_profile(t_no, p_rank)
+                avg_del = float(profile.get("avg_arrival_delay_min", 10.0))
+                punct = float(profile.get("historical_on_time_pct", 85.0))
+                bottlenecks = profile.get("station_bottleneck_probability", {})
+                b_prob = float(bottlenecks.get(stn, 0.0))
+                sim_delay = (avg_del * 0.4 if punct >= 90.0 else avg_del) + (b_prob * 8.0)
+
+        sim_delay = round(max(0.0, sim_delay), 1)
+
         if sched_dt:
             eta_dt = sched_dt + datetime.timedelta(minutes=sim_delay)
             if eta_dt < now_ist - datetime.timedelta(minutes=10):
@@ -744,9 +852,7 @@ def get_station_board_endpoint(station_code: str, express_only: bool = Query(Tru
         else:
             eta_dt = now_ist + datetime.timedelta(minutes=15 + idx * 10 + sim_delay)
 
-        tag = "On Time" if sim_delay <= 0 else f"Delayed by {int(sim_delay)}m"
-        if sim_delay > 20:
-            tag = f"Delayed by {int(sim_delay)}m"
+        tag = "On Time" if sim_delay <= 2.0 else f"Delayed by {int(sim_delay)}m"
 
         items.append(StationBoardItem(
             train_number=r["train_number"],
@@ -754,7 +860,7 @@ def get_station_board_endpoint(station_code: str, express_only: bool = Query(Tru
             scheduled_time=str(sched_time)[:5],
             predicted_eta=eta_dt.strftime("%H:%M"),
             delay_min=sim_delay,
-            status="ON_TIME" if sim_delay <= 0 else "DELAYED",
+            status="ON_TIME" if sim_delay <= 2.0 else "DELAYED",
             delay_tag=tag
         ))
 

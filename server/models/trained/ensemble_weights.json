@@ -1,7 +1,7 @@
 {
-  "weight_lgb": 0.55,
-  "weight_stgcn": 0.45,
-  "bias": -0.018,
+  "weight_lgb": 0.69,
+  "weight_stgcn": 0.31,
+  "bias": 0.027,
   "hop_decay": 0.04,
   "meta_weights": {}
 }

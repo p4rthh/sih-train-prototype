@@ -352,13 +352,13 @@ def run_benchmarks():
 
     if corridor_X and stgcn_model.is_fitted:
         X_t = torch.tensor(np.array(corridor_X), dtype=torch.float32)
-        lap_mean = torch.tensor(np.mean(corridor_adj, axis=0), dtype=torch.float32)
+        lap_batch = torch.tensor(np.array(corridor_adj), dtype=torch.float32)
         stgcn_raw = RailwaySTGCN(in_features=F_IN, hidden_dim=32, num_timesteps=T_STEPS)
         if STGCN_MODEL_PATH.exists():
             stgcn_raw.load_state_dict(torch.load(str(STGCN_MODEL_PATH), weights_only=True))
             stgcn_raw.eval()
             with torch.no_grad():
-                out_g = stgcn_raw(X_t, lap_mean).numpy() * 6.0
+                out_g = stgcn_raw(X_t, lap_batch).numpy() * 6.0
                 y_g_true = np.array(corridor_Y) * 6.0
 
             stgcn_mae = mean_absolute_error(y_g_true.flatten(), out_g.flatten())

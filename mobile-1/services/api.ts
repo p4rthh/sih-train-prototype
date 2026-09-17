@@ -1,4 +1,12 @@
-import { TrainSearchResult, ETAResponse, StationBoardItem } from "../types";
+import {
+  TrainSearchResult,
+  ETAResponse,
+  StationBoardItem,
+  TrainInstanceSummary,
+  RouteSearchResultItem,
+  StationSearchResult,
+  PNRResponse
+} from "../types";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 
@@ -7,6 +15,10 @@ import Constants from "expo-constants";
  */
 function resolveBackendHost(): string {
   try {
+    if (process.env.EXPO_PUBLIC_API_URL) {
+      return process.env.EXPO_PUBLIC_API_URL.trim().replace(/\/+$/, "");
+    }
+
     const hostUri =
       Constants.expoConfig?.hostUri ??
       (Constants as any).manifest?.debuggerHost ??
@@ -94,15 +106,28 @@ export async function searchTrains(query: string): Promise<TrainSearchResult[]> 
   }
 }
 
-export async function getTrainETA(trainNo: string): Promise<ETAResponse | null> {
+export async function getTrainETA(trainNo: string, startDate?: string): Promise<ETAResponse | null> {
   try {
-    const url = `${getApiBaseUrl()}/api/train/${encodeURIComponent(trainNo)}/eta`;
+    const query = startDate ? `?start_date=${encodeURIComponent(startDate)}` : "";
+    const url = `${getApiBaseUrl()}/api/train/${encodeURIComponent(trainNo)}/eta${query}`;
     const res = await fetch(url, { headers: DEFAULT_HEADERS });
     if (!res.ok) throw new Error(`ETA failed: ${res.status}`);
     return await res.json();
   } catch (err) {
     console.warn(`[API] getTrainETA failed for ${trainNo} at ${getApiBaseUrl()}:`, err);
     return null;
+  }
+}
+
+export async function getTrainInstances(trainNo: string): Promise<TrainInstanceSummary[]> {
+  try {
+    const url = `${getApiBaseUrl()}/api/train/${encodeURIComponent(trainNo)}/instances`;
+    const res = await fetch(url, { headers: DEFAULT_HEADERS });
+    if (!res.ok) throw new Error(`Instances failed: ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn(`[API] getTrainInstances failed for ${trainNo} at ${getApiBaseUrl()}:`, err);
+    return [];
   }
 }
 
@@ -122,7 +147,7 @@ export async function searchTrainsBetweenStations(
   fromStn: string,
   toStn: string,
   expressOnly: boolean = true
-): Promise<any[]> {
+): Promise<RouteSearchResultItem[]> {
   if (!fromStn || !toStn) return [];
   try {
     const url = `${getApiBaseUrl()}/api/trains/route?from_stn=${encodeURIComponent(fromStn.trim())}&to_stn=${encodeURIComponent(toStn.trim())}&express_only=${expressOnly}`;
@@ -135,7 +160,7 @@ export async function searchTrainsBetweenStations(
   }
 }
 
-export async function searchStations(query: string): Promise<any[]> {
+export async function searchStations(query: string): Promise<StationSearchResult[]> {
   if (!query || query.trim().length < 1) return [];
   try {
     const url = `${getApiBaseUrl()}/api/stations/search?q=${encodeURIComponent(query.trim())}`;
@@ -148,7 +173,7 @@ export async function searchStations(query: string): Promise<any[]> {
   }
 }
 
-export async function getPnrStatus(pnrNo: string): Promise<any | null> {
+export async function getPnrStatus(pnrNo: string): Promise<PNRResponse | null> {
   if (!pnrNo || pnrNo.trim().length < 10) return null;
   try {
     const url = `${getApiBaseUrl()}/api/pnr/${encodeURIComponent(pnrNo.trim())}`;
@@ -161,7 +186,8 @@ export async function getPnrStatus(pnrNo: string): Promise<any | null> {
   }
 }
 
-export function getTrainStreamURL(trainNo: string): string {
-  const wsUrl = `${getWsBaseUrl()}/api/train/${encodeURIComponent(trainNo)}/stream`;
+export function getTrainStreamURL(trainNo: string, startDate?: string): string {
+  const query = startDate ? `?start_date=${encodeURIComponent(startDate)}` : "";
+  const wsUrl = `${getWsBaseUrl()}/api/train/${encodeURIComponent(trainNo)}/stream${query}`;
   return wsUrl;
 }

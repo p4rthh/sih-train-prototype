@@ -8,9 +8,10 @@ router = APIRouter(tags=["WebSocket Stream"])
 @router.websocket("/api/train/{train_no}/stream")
 async def websocket_train_stream(websocket: WebSocket, train_no: str):
     await websocket.accept()
+    start_date = websocket.query_params.get("start_date")
     try:
         while True:
-            eta_packet = get_train_eta_endpoint(train_no)
+            eta_packet = get_train_eta_endpoint(train_no, start_date=start_date)
             await websocket.send_text(eta_packet.model_dump_json())
             await asyncio.sleep(3.0)
     except WebSocketDisconnect:

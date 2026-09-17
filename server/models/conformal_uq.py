@@ -65,11 +65,15 @@ class ConformalCalibrator:
     ) -> Tuple[float, float]:
         key = self._get_bucket_key(priority, progress)
         margin = self.bucket_q_hats.get(key, self.q_hat)
-        margin = max(0.4, min(10.0, margin))
+        margin = max(-4.0, min(10.0, margin))
 
-        lower = round(float(q10) - margin, 2)
-        upper = round(float(q90) + margin, 2)
-        return lower, upper
+        raw_lower = float(q10) - margin
+        raw_upper = float(q90) + margin
+        lower = min(raw_lower, raw_upper)
+        upper = max(raw_lower, raw_upper)
+        if upper - lower < 1.0:
+            upper = lower + 1.0
+        return round(lower, 2), round(upper, 2)
 
     def save(self):
         os.makedirs(CQR_PARAMS_PATH.parent, exist_ok=True)

@@ -1,27 +1,30 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from server.api.routes_eta import router as eta_router, init_ml_engine
 from server.api.routes_ws import router as ws_router
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_ml_engine()
+    yield
+
 app = FastAPI(
     title="NavaRail",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(eta_router)
 app.include_router(ws_router)
-
-@app.on_event("startup")
-def on_startup():
-    init_ml_engine()
 
 @app.get("/")
 def root():

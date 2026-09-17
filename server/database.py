@@ -3,7 +3,12 @@ from typing import List, Dict, Optional, Any
 from server.config import DB_PATH
 
 def get_db_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    conn = sqlite3.connect(str(DB_PATH), timeout=25.0, check_same_thread=False)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+    except Exception:
+        pass
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -94,10 +99,21 @@ STATION_CODE_ALIASES = {
     "LKO": "LJN",
     "LJN": "LKO",
     "CSMT": "CSTM",
-    "CSTM": "CSMT"
+    "CSTM": "CSMT",
+    "BPL": "RKMP",
+    "RKMP": "BPL",
+    "NZM": "NDLS",
+    "HWH": "SDAH"
 }
 
+MAX_SCHEDULE_CACHE_SIZE = 250
 LIVE_SCHEDULE_CACHE: Dict[str, List[Dict[str, Any]]] = {}
+
+def prune_schedule_cache_if_needed():
+    if len(LIVE_SCHEDULE_CACHE) > MAX_SCHEDULE_CACHE_SIZE:
+        keys_to_remove = list(LIVE_SCHEDULE_CACHE.keys())[:75]
+        for k in keys_to_remove:
+            LIVE_SCHEDULE_CACHE.pop(k, None)
 
 def get_train_schedule(train_no: str) -> List[Dict[str, Any]]:
     raw_no = str(train_no).strip()
@@ -150,6 +166,7 @@ def get_train_schedule(train_no: str) -> List[Dict[str, Any]]:
                 })
 
             if len(stops) >= 2:
+                prune_schedule_cache_if_needed()
                 LIVE_SCHEDULE_CACHE[t_no] = stops
                 try:
                     conn = get_db_connection()

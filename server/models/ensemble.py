@@ -33,13 +33,7 @@ class StackingEnsemble:
         w_lgb_eff = max(0.40, self.w_lgb - decay_factor)
         w_stgcn_eff = 1.0 - w_lgb_eff
 
-        # Disagreement dampening
-        diff = abs(pred_lgb - pred_stgcn)
-        damping = 0.0
-        if diff > 4.0:
-            damping = -0.15 * min(3.0, diff - 4.0)
-
-        blended = (w_lgb_eff * pred_lgb) + (w_stgcn_eff * pred_stgcn) + self.bias + damping
+        blended = (w_lgb_eff * pred_lgb) + (w_stgcn_eff * pred_stgcn) + self.bias
         return round(float(blended), 2)
 
     def fit(

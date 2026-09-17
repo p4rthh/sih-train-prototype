@@ -35,9 +35,29 @@ class RouteStop(BaseModel):
     is_recovered: Optional[bool] = False
     recovered_min: Optional[float] = 0.0
 
+class TrainInstanceSummary(BaseModel):
+    instance_id: str
+    train_no: str
+    start_date: str
+    start_date_display: str
+    label: str
+    is_today: bool
+    run_status: str
+    current_station_code: str
+    current_station_name: str
+    next_station_code: Optional[str] = None
+    next_station_name: Optional[str] = None
+    current_delay_min: float = 0.0
+    speed_kmh: float = 0.0
+    position_desc: Optional[str] = None
+
 class ETAResponse(BaseModel):
     train_no: str
     train_name: str
+    instance_id: Optional[str] = None
+    start_date: Optional[str] = None
+    start_date_label: Optional[str] = None
+    active_instances: Optional[List[TrainInstanceSummary]] = []
     run_status: Optional[str] = "RUNNING"
     current_station_code: str
     current_station_name: str

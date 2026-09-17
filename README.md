@@ -58,7 +58,7 @@ python3 -m uvicorn server.api.main:app --host 0.0.0.0 --port 8000 --reload
 
 ### 2. Start React Native App
 ```bash
-cd mobile
+cd mobile-1
 npx expo start
 ```
 - Press `a` for Android Emulator

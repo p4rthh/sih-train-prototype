@@ -79,12 +79,18 @@ class DelayLightGBM:
 
     def predict(self, X_input: pd.DataFrame) -> Dict[str, float]:
         if not self.is_fitted:
-            self.load()
+            loaded = self.load()
+            if not loaded or self.point_model is None:
+                return {
+                    "point_delta": 0.0,
+                    "q10_delta": -1.5,
+                    "q90_delta": 2.5
+                }
 
         X_eval = X_input[FEATURE_NAMES]
         point = float(self.point_model.predict(X_eval)[0])
-        q10 = float(self.q10_model.predict(X_eval)[0])
-        q90 = float(self.q90_model.predict(X_eval)[0])
+        q10 = float(self.q10_model.predict(X_eval)[0]) if self.q10_model else point - 1.5
+        q90 = float(self.q90_model.predict(X_eval)[0]) if self.q90_model else point + 2.5
 
         q10_clean = min(q10, point)
         q90_clean = max(q90, point)
@@ -97,12 +103,15 @@ class DelayLightGBM:
 
     def predict_batch(self, X_input: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         if not self.is_fitted:
-            self.load()
+            loaded = self.load()
+            if not loaded or self.point_model is None:
+                n = len(X_input)
+                return np.zeros(n), np.full(n, -1.5), np.full(n, 2.5)
 
         X_eval = X_input[FEATURE_NAMES]
         pts = self.point_model.predict(X_eval)
-        q10s = self.q10_model.predict(X_eval)
-        q90s = self.q90_model.predict(X_eval)
+        q10s = self.q10_model.predict(X_eval) if self.q10_model else pts - 1.5
+        q90s = self.q90_model.predict(X_eval) if self.q90_model else pts + 2.5
 
         q10s_clean = np.minimum(q10s, pts)
         q90s_clean = np.maximum(q90s, pts)

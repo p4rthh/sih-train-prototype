@@ -1,26 +1,31 @@
 import React from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AlertTriangle, CheckCircle2, MapPin, Train } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { colors, radius, space, type } from '../theme/tokens';
-import { useTrainStream } from '../hooks/useTrainStream';
+import { useTrainInstance } from '../context/TrainInstanceContext';
 import type { TrainTabsParamList } from '../navigation/types';
 
 type Props = BottomTabScreenProps<TrainTabsParamList, 'Alerts'>;
 
-// Rebuilt from the Stitch project's alerts.html. That reference shows a fixed demo feed
-// ("Arriving Soon" / "On Time" / "Minor Delay" cards) — there's no dedicated alerts-feed
-// endpoint on the API, so this derives real cards from the same ETAResponse every other tab
-// uses (current delay status, each entry in delay_reasons) rather than shipping the reference's
-// literal placeholder copy as static content.
 export function AlertsScreen({ route }: Props) {
   const { trainNo } = route.params;
-  const { data } = useTrainStream(trainNo);
+  const { data, error, refresh } = useTrainInstance();
 
   if (!data) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color={colors.pinkDeep} size="large" />
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorTitle}>Unable to Load Live Alerts</Text>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+              <Text style={styles.retryButtonText}>Retry Connection</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <ActivityIndicator color={colors.pinkDeep} size="large" />
+        )}
       </View>
     );
   }
@@ -222,5 +227,32 @@ const styles = StyleSheet.create({
     ...type.body,
     fontSize: 13,
     color: colors.maroon,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    paddingHorizontal: space.lg,
+  },
+  errorTitle: {
+    ...type.h2,
+    fontSize: 16,
+    color: colors.ink,
+    marginBottom: space.xs,
+  },
+  errorText: {
+    ...type.body,
+    fontSize: 13,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    marginBottom: space.md,
+  },
+  retryButton: {
+    backgroundColor: colors.pinkDeep,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: radius.md,
+  },
+  retryButtonText: {
+    ...type.label,
+    color: colors.white,
   },
 });

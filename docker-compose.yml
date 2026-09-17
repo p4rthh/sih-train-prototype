@@ -1,0 +1,18 @@
+services:
+  navarail-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: navarail-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

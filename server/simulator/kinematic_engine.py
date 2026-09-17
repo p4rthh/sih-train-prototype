@@ -6,9 +6,11 @@ from server.config import get_train_priority, FOG_SEVERE_THRESHOLD_M, FOG_MODERA
 from server.ingestion.station_coords import haversine_distance_km
 
 class TrainSimulator:
-    def __init__(self, train_no: str, schedule: List[Dict[str, Any]], start_delay_min: float = 0.0):
+    def __init__(self, train_no: str, schedule: List[Dict[str, Any]], start_delay_min: float = 0.0, start_date: Optional[datetime.date] = None):
         self.train_no = str(train_no).strip()
         self.schedule = schedule
+        self.start_date = start_date or datetime.date.today()
+        self.instance_id = f"{self.train_no}_{self.start_date.strftime('%Y-%m-%d')}"
         self.train_name = schedule[0].get("train_name", f"Train {train_no}") if schedule else f"Train {train_no}"
         self.priority = get_train_priority(self.train_no, self.train_name)
         
@@ -196,69 +198,75 @@ class TrainSimulator:
         return True
 
     def sync_to_current_time(self) -> bool:
-        now_ist = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
-        current_minute = now_ist.hour * 60 + now_ist.minute
+        tz_ist = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+        now_ist = datetime.datetime.now(tz_ist)
 
-        orig_dep = self.route_stops[0].get("departure") or self.route_stops[0].get("arrival")
-        if orig_dep:
-            try:
-                oh, om = map(int, str(orig_dep).split(":")[:2])
-                orig_m = oh * 60 + om
-                if current_minute < orig_m:
-                    self.current_stop_idx = 0
-                    self.current_lat = self.route_stops[0]["lat"]
-                    self.current_lon = self.route_stops[0]["lon"]
-                    self.current_speed_kmh = 0.0
-                    self.current_delay_min = 0.0
-                    self.status = "YET_TO_START"
-                    return True
-            except Exception:
-                pass
+        orig_stop = self.route_stops[0]
+        orig_dep = orig_stop.get("departure") or orig_stop.get("arrival") or "00:00"
+        try:
+            oh, om = map(int, str(orig_dep).split(":")[:2])
+            orig_dt = datetime.datetime(self.start_date.year, self.start_date.month, self.start_date.day, oh, om, tzinfo=tz_ist)
+            if now_ist < orig_dt:
+                self.current_stop_idx = 0
+                self.current_lat = orig_stop["lat"]
+                self.current_lon = orig_stop["lon"]
+                self.current_speed_kmh = 0.0
+                self.current_delay_min = 0.0
+                self.status = "YET_TO_START"
+                return True
+        except Exception:
+            pass
 
-        for idx, stop in enumerate(self.route_stops[:-1]):
-            dep_str = stop.get("departure") or stop.get("arrival")
-            nxt_str = self.route_stops[idx+1].get("arrival") or self.route_stops[idx+1].get("departure")
-            if not dep_str or not nxt_str:
+        # Check last stop arrival
+        dest_stop = self.route_stops[-1]
+        dest_arr = dest_stop.get("arrival") or dest_stop.get("departure") or "23:59"
+        dest_day = int(dest_stop.get("day", 1) or 1)
+        try:
+            dh, dm = map(int, str(dest_arr).split(":")[:2])
+            dest_date = self.start_date + datetime.timedelta(days=dest_day - 1)
+            dest_dt = datetime.datetime(dest_date.year, dest_date.month, dest_date.day, dh, dm, tzinfo=tz_ist) + datetime.timedelta(minutes=round(self.current_delay_min))
+            if now_ist >= dest_dt:
+                self.current_stop_idx = len(self.route_stops) - 1
+                self.current_lat = dest_stop["lat"]
+                self.current_lon = dest_stop["lon"]
+                self.current_speed_kmh = 0.0
+                self.status = "COMPLETED"
+                return True
+        except Exception:
+            pass
+
+        # Find position across route stops
+        for idx in range(len(self.route_stops) - 1):
+            curr_s = self.route_stops[idx]
+            nxt_s = self.route_stops[idx + 1]
+
+            curr_dep_str = curr_s.get("departure") or curr_s.get("arrival")
+            nxt_arr_str = nxt_s.get("arrival") or nxt_s.get("departure")
+            if not curr_dep_str or not nxt_arr_str:
                 continue
             try:
-                dh, dm = map(int, str(dep_str).split(":")[:2])
-                ah, am = map(int, str(nxt_str).split(":")[:2])
-                dep_m = dh * 60 + dm
-                arr_m = ah * 60 + am
-                if arr_m < dep_m:
-                    arr_m += 1440
-                
-                check_m = current_minute
-                if check_m < dep_m and current_minute + 1440 <= arr_m:
-                    check_m += 1440
+                ch, cm = map(int, str(curr_dep_str).split(":")[:2])
+                c_day = int(curr_s.get("day", 1) or 1)
+                c_date = self.start_date + datetime.timedelta(days=c_day - 1)
+                c_dt = datetime.datetime(c_date.year, c_date.month, c_date.day, ch, cm, tzinfo=tz_ist)
 
-                if dep_m <= check_m <= arr_m:
-                    frac = (check_m - dep_m) / max(1.0, float(arr_m - dep_m))
+                nh, nm = map(int, str(nxt_arr_str).split(":")[:2])
+                n_day = int(nxt_s.get("day", 1) or 1)
+                n_date = self.start_date + datetime.timedelta(days=n_day - 1)
+                n_dt = datetime.datetime(n_date.year, n_date.month, n_date.day, nh, nm, tzinfo=tz_ist)
+
+                if c_dt <= now_ist <= n_dt:
+                    total_dur = max(1.0, (n_dt - c_dt).total_seconds())
+                    frac = min(1.0, max(0.0, (now_ist - c_dt).total_seconds() / total_dur))
                     self.current_stop_idx = idx
-                    self.current_lat = round(stop["lat"] + (self.route_stops[idx+1]["lat"] - stop["lat"]) * frac, 6)
-                    self.current_lon = round(stop["lon"] + (self.route_stops[idx+1]["lon"] - stop["lon"]) * frac, 6)
+                    self.current_lat = round(curr_s["lat"] + (nxt_s["lat"] - curr_s["lat"]) * frac, 6)
+                    self.current_lon = round(curr_s["lon"] + (nxt_s["lon"] - curr_s["lon"]) * frac, 6)
                     self.current_speed_kmh = self.max_speed_kmh * 0.85
-                    self.section_dist_covered_km = self.route_stops[idx+1]["section_km"] * frac
+                    self.section_dist_covered_km = nxt_s.get("section_km", 15.0) * frac
                     self.status = "RUNNING"
                     return True
             except Exception:
                 continue
-
-        # If after all schedule stops on Day 1
-        dstn_arr = self.route_stops[-1].get("arrival") or self.route_stops[-1].get("departure")
-        if dstn_arr and self.route_stops[-1].get("day", 1) == 1:
-            try:
-                dh, dm = map(int, str(dstn_arr).split(":")[:2])
-                dstn_m = dh * 60 + dm
-                if current_minute > dstn_m:
-                    self.current_stop_idx = len(self.route_stops) - 1
-                    self.current_lat = self.route_stops[-1]["lat"]
-                    self.current_lon = self.route_stops[-1]["lon"]
-                    self.current_speed_kmh = 0.0
-                    self.status = "COMPLETED"
-                    return True
-            except Exception:
-                pass
 
         return False
 
@@ -335,6 +343,8 @@ class TrainSimulator:
 
             self.current_delay_min = round(self.current_delay_min + delay_added_min, 1)
             self.delay_history.append(self.current_delay_min)
+            if len(self.delay_history) > 30:
+                self.delay_history = self.delay_history[-30:]
 
         return self.get_state()
 
@@ -346,6 +356,11 @@ class TrainSimulator:
         
         rem_dist = max(0.0, float(last_stop.get("cum_dist_km", 0.0)) - float(curr.get("cum_dist_km", 0.0)) - self.section_dist_covered_km)
         sched_dwell = float(curr.get("halt_min", 2.0))
+
+        # Dynamic upstream delay reflection
+        upstream_del = 0.0
+        if self.status == "RUNNING" and self.current_delay_min > 8.0 and self.priority >= 3:
+            upstream_del = round(min(30.0, self.current_delay_min * 0.45), 1)
 
         return {
             "train_no": self.train_no,
@@ -369,6 +384,9 @@ class TrainSimulator:
             "prev_departure_time": curr.get("departure") or curr.get("arrival"),
             "scheduled_arrival_time": nxt.get("arrival") or nxt.get("departure"),
             "dist_to_destination_km": round(rem_dist, 2),
-            "is_loco_reversal": 1 if sched_dwell >= 20.0 else 0
+            "is_loco_reversal": 1 if sched_dwell >= 20.0 else 0,
+            "upstream_train_delay": upstream_del,
+            "start_date": self.start_date.strftime("%Y-%m-%d"),
+            "instance_id": self.instance_id,
         }
 

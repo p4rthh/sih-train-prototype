@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TextInputProps, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, TextInputProps, TouchableOpacity, View } from 'react-native';
 import { ArrowUpDown, ListTree, MapPin, Route, Search, Train } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, space, stitchColors, stitchRadius, stitchType, type } from '../theme/tokens';
@@ -33,24 +33,17 @@ export function HomeScreen({ navigation }: Props) {
       <View style={styles.header}>
         <Text style={styles.wordmark}>Navarail</Text>
       </View>
-      <FlatList
-        data={[0]}
-        keyExtractor={() => 'home'}
-        contentContainerStyle={styles.scroll}
-        renderItem={() => (
-          <>
-            <View style={styles.archHeader}>
-              <Text style={styles.archTitle}>Where to?</Text>
-              <Text style={styles.archSubtitle}>Track live status and schedules</Text>
-            </View>
-            <View style={styles.cards}>
-              <ByTrainCard onSelectTrain={goToTrain} />
-              <BetweenStationsCard onSelectTrain={goToTrain} />
-              <StationBoardCard onSelectStation={goToStation} />
-            </View>
-          </>
-        )}
-      />
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.archHeader}>
+          <Text style={styles.archTitle}>Where to?</Text>
+          <Text style={styles.archSubtitle}>Track live status and schedules</Text>
+        </View>
+        <View style={styles.cards}>
+          <ByTrainCard onSelectTrain={goToTrain} />
+          <BetweenStationsCard onSelectTrain={goToTrain} />
+          <StationBoardCard onSelectStation={goToStation} />
+        </View>
+      </ScrollView>
     </View>
   );
 }

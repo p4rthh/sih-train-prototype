@@ -104,6 +104,11 @@ class WeatherClient:
             record["wind_speed_kmh"],
             record["weather_code"]
         ))
+        # Prune records older than 3 days to prevent unbounded growth
+        try:
+            cursor.execute("DELETE FROM weather_cache WHERE timestamp < datetime('now', '-3 days')")
+        except Exception:
+            pass
         conn.commit()
         conn.close()
 
