@@ -122,10 +122,49 @@ def get_train_schedule(train_no: str) -> List[Dict[str, Any]]:
     if t_no in LIVE_SCHEDULE_CACHE:
         return LIVE_SCHEDULE_CACHE[t_no]
 
-    # Query official live timetable schedule from NTES
+    # Check local SQLite database first (instantaneous & contains complete Indian Railways timetables)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT 
+            s.seq,
+            s.train_number,
+            s.train_name,
+            s.station_code,
+            s.station_name,
+            s.arrival,
+            s.departure,
+            s.day,
+            s.halt_min,
+            st.lat,
+            st.lon
+        FROM schedules s
+        LEFT JOIN stations st ON s.station_code = st.station_code
+        WHERE s.train_number = ?
+        ORDER BY s.seq ASC
+    """, (t_no,))
+    rows = cursor.fetchall()
+    conn.close()
+
+    if rows and len(rows) >= 2:
+        result = []
+        for r in rows:
+            d = dict(r)
+            if not d.get("lat") or not d.get("lon"):
+                code = d.get("station_code", "").upper()
+                if code in STATION_CODE_ALIASES:
+                    stn = get_station_info(STATION_CODE_ALIASES[code])
+                    if stn:
+                        d["lat"] = stn.get("lat")
+                        d["lon"] = stn.get("lon")
+            result.append(d)
+        LIVE_SCHEDULE_CACHE[t_no] = result
+        return result
+
+    # Fallback to NTES for newly commissioned special trains not yet in database
     try:
         from ntes import NTESClient
-        client = NTESClient()
+        client = NTESClient(timeout=2, retries=0)
         res = client.schedule(t_no)
         if res and isinstance(res, dict) and res.get("stations"):
             stops = []
@@ -187,41 +226,7 @@ def get_train_schedule(train_no: str) -> List[Dict[str, Any]]:
     except Exception:
         pass
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT 
-            s.seq,
-            s.train_number,
-            s.train_name,
-            s.station_code,
-            s.station_name,
-            s.arrival,
-            s.departure,
-            s.day,
-            s.halt_min,
-            st.lat,
-            st.lon
-        FROM schedules s
-        LEFT JOIN stations st ON s.station_code = st.station_code
-        WHERE s.train_number = ?
-        ORDER BY s.seq ASC
-    """, (t_no,))
-    rows = cursor.fetchall()
-    conn.close()
-
-    result = []
-    for r in rows:
-        d = dict(r)
-        if not d.get("lat") or not d.get("lon"):
-            code = d.get("station_code", "").upper()
-            if code in STATION_CODE_ALIASES:
-                stn = get_station_info(STATION_CODE_ALIASES[code])
-                if stn:
-                    d["lat"] = stn.get("lat")
-                    d["lon"] = stn.get("lon")
-        result.append(d)
-    return result
+    return []
 
 def get_station_info(station_code: str) -> Optional[Dict[str, Any]]:
     conn = get_db_connection()

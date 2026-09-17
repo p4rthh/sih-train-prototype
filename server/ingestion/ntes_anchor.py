@@ -20,7 +20,7 @@ def prune_ntes_cache():
             NTES_CACHE.pop(k, None)
             NTES_CACHE_TIMESTAMP.pop(k, None)
 
-ntes_client = NTESClient(timeout=2, retries=0)
+ntes_client = NTESClient(timeout=1.5, retries=0)
 
 def parse_date_arg(date_str: Optional[str]) -> datetime.date:
     tz_ist = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
@@ -51,9 +51,12 @@ def get_live_ntes_anchor(train_no: str, start_date_str: Optional[str] = None) ->
     cache_key = f"{t_no}_{date_iso}"
 
     if cache_key in NTES_CACHE and (now_ts - NTES_CACHE_TIMESTAMP.get(cache_key, 0)) < CACHE_TTL_SECONDS:
-        cached = dict(NTES_CACHE[cache_key])
-        cached["train_no"] = raw_no
-        return cached
+        cached = NTES_CACHE[cache_key]
+        if cached is None:
+            return None
+        res_dict = dict(cached)
+        res_dict["train_no"] = raw_no
+        return res_dict
 
     prune_ntes_cache()
 
@@ -71,8 +74,12 @@ def get_live_ntes_anchor(train_no: str, start_date_str: Optional[str] = None) ->
                     date_iso = target_date.strftime("%Y-%m-%d")
                     cache_key = f"{t_no}_{date_iso}"
                 else:
+                    NTES_CACHE[cache_key] = None
+                    NTES_CACHE_TIMESTAMP[cache_key] = now_ts
                     return None
             else:
+                NTES_CACHE[cache_key] = None
+                NTES_CACHE_TIMESTAMP[cache_key] = now_ts
                 return None
 
         cpos = str(res.get("CPOS") or "").strip()
@@ -254,9 +261,13 @@ def get_live_ntes_anchor(train_no: str, start_date_str: Optional[str] = None) ->
             anchor_data["train_no"] = raw_no
             return anchor_data
 
+        NTES_CACHE[cache_key] = None
+        NTES_CACHE_TIMESTAMP[cache_key] = now_ts
         return None
 
     except Exception:
+        NTES_CACHE[cache_key] = None
+        NTES_CACHE_TIMESTAMP[cache_key] = now_ts
         return None
 
 def get_active_ntes_instances(train_no: str, schedule: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:

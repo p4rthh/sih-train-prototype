@@ -3,7 +3,7 @@ import datetime
 from typing import Dict, Any, Optional
 from ntes import NTESClient
 
-ntes_client = NTESClient()
+ntes_client = NTESClient(timeout=3, retries=0)
 
 SAMPLE_EXPRESS_TRAINS = [
     {"train_number": "12952", "train_name": "Mumbai Rajdhani Express", "from_code": "NDLS", "from_name": "NEW DELHI", "to_code": "BCT", "to_name": "MUMBAI CENTRAL", "dep": "16:55", "coach": "B3", "berth": "42"},

@@ -43,7 +43,8 @@ function resolveBackendHost(): string {
     console.warn("[API] Could not resolve host from Expo Constants:", err);
   }
 
-  return Platform.OS === "android" ? "10.0.2.2" : "localhost";
+  // If in release standalone APK without Metro, default to production Railway domain
+  return "https://sih-train-prototype-production-9fd3.up.railway.app";
 }
 
 let currentHost = resolveBackendHost();
