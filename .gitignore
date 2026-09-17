@@ -3,15 +3,19 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.pkl
 *.parquet
+
+# Keep models except checkpoints
+!server/models/trained/*.pkl
 
 # Data
 data/raw/
 data/processed/
-*.db
 *.sqlite
 *.sqlite3
+
+# Explicitly track the production dataset
+!data/sih_train.db
 
 # Node / React Native / Expo
 node_modules/

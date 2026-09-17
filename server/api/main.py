@@ -3,9 +3,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from server.api.routes_eta import router as eta_router, init_ml_engine
 from server.api.routes_ws import router as ws_router
+from server.database import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_db()
     init_ml_engine()
     yield
 
