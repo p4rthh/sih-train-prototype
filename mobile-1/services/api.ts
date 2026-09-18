@@ -23,6 +23,16 @@ function resolveBackendHost(): string {
       return url;
     }
 
+    // Web browser local development -> use localhost backend
+    if (Platform.OS === "web") {
+      return "http://localhost:8000";
+    }
+
+    // Release standalone APK (not in Expo dev mode) -> production Railway domain
+    if (!__DEV__) {
+      return "https://sih-train-prototype-production-9fd3.up.railway.app";
+    }
+
     const hostUri =
       Constants.expoConfig?.hostUri ??
       (Constants as any).manifest?.debuggerHost ??
@@ -31,7 +41,6 @@ function resolveBackendHost(): string {
     if (hostUri && typeof hostUri === "string") {
       // If running via Expo ngrok tunnel (e.g. xxxx.ngrok.io or xxxx.exp.direct)
       if (hostUri.includes("ngrok") || hostUri.includes("exp.direct")) {
-        // Will be configured or fall back
         return hostUri.split(":")[0];
       }
       const ip = hostUri.split(":")[0];
@@ -43,8 +52,8 @@ function resolveBackendHost(): string {
     console.warn("[API] Could not resolve host from Expo Constants:", err);
   }
 
-  // If in release standalone APK without Metro, default to production Railway domain
-  return "https://sih-train-prototype-production-9fd3.up.railway.app";
+  // Fallback for local emulator or development
+  return Platform.OS === "android" ? "10.0.2.2" : "localhost";
 }
 
 let currentHost = resolveBackendHost();
