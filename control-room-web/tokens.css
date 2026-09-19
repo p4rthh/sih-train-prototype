@@ -1,0 +1,142 @@
+/* ==========================================================================
+   NavaRail Heavy Industrial SCADA Design System — Locked Tokens (tokens.css)
+   System: Indian Railways SCADA Traffic Management & CAD Console
+   Palette: Matte Industrial Graphite · Dispatch Amber Gold · Signal Emerald · Caution Amber · Stop Red
+   Aesthetics: Engineering Precision, Zero Blue/Purple AI Gradients, Pure Mission-Critical Contrast
+   ========================================================================== */
+
+@font-face {
+  font-family: 'Samarkan';
+  src: url('Samarkan.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Surface Plateaus (Matte Industrial Graphite & Dark Slate Bedrock) */
+  --color-canvas: #111215;                          /* Deepest bedrock substrate */
+  --color-canvas-inset: #0a0b0d;                    /* Recessed wells / telemetry bays */
+  --color-paper: #17181c;                           /* Primary dock panel console */
+  --color-paper-elevated: #1f2126;                  /* Equipment cards / dialogs */
+  --color-paper-card: #1c1e23;                      /* Container elevation */
+  --color-paper-hover: #262930;                     /* Hover elevation */
+  --color-paper-active: #2e323b;                    /* Pressed state */
+  --color-nav: #0d0e10;                             /* Side rail backdrop */
+  --color-overlay: rgba(17, 18, 21, 0.88);          /* Backdrop overlay */
+
+  /* Linework & Structural Hairlines (Precision Steel Separators) */
+  --color-rule: #292c34;                            /* Hairline borders 1px */
+  --color-rule-subtle: #1e2026;                     /* Quiet grid dividers */
+  --color-rule-active: #f59e0b;                     /* Active focused border */
+  --color-rule-highlight: #383d47;                  /* Elevated border */
+
+  /* Typography & Readout Contrast (Inter + JetBrains Mono) */
+  --color-ink: #f4f4f6;                             /* Headings, IDs, critical readouts */
+  --color-ink-secondary: #d1d5db;                   /* Secondary descriptions, table cells */
+  --color-ink-muted: #9ca3af;                       /* Labels, unit names, axis tags */
+  --color-ink-dim: #6b7280;                         /* Track guidelines, inactive badges */
+
+  /* Operational Railway Signals (Authentic High-Contrast Signal Colors) */
+  --color-nominal: #16a34a;                         /* Proceed / Clear aspect (Railway Emerald) */
+  --color-nominal-subtle: rgba(22, 163, 74, 0.16);
+  --color-nominal-ink: #f0fdf4;
+  --color-nominal-border: #15803d;
+
+  --color-caution: #f59e0b;                         /* Caution / Restrictive aspect (Railway Amber) */
+  --color-caution-subtle: rgba(245, 158, 11, 0.16);
+  --color-caution-ink: #fffbeb;
+  --color-caution-border: #d97706;
+
+  --color-danger: #dc2626;                          /* Red signal / Emergency brake (Railway Red) */
+  --color-danger-subtle: rgba(220, 38, 38, 0.16);
+  --color-danger-ink: #fef2f2;
+  --color-danger-border: #b91c1c;
+
+  /* Primary Accent: Industrial Dispatch Amber-Gold (Zero Cyan / Zero Blue) */
+  --color-accent: #f59e0b;                          /* Dispatch Gold / Amber Active */
+  --color-accent-subtle: rgba(245, 158, 11, 0.14);
+  --color-accent-ink: #fef3c7;
+  --color-accent-border: #d97706;
+
+  /* Secondary Accent: Industrial Safety Orange / Terracotta (Zero Purple / Zero Violet) */
+  --color-ai: #ea580c;                              /* Oxide Orange / Analytical Model */
+  --color-ai-subtle: rgba(234, 88, 12, 0.14);
+  --color-ai-ink: #ffedd5;
+
+  --color-focus: #f59e0b;                           /* 2px solid keyboard focus ring */
+  --color-cyan: var(--color-accent);                /* Backward compatibility alias mapped to Amber */
+
+  /* Typography Stacks — Montserrat + JetBrains Mono + Samarkan */
+  --font-brand: 'Samarkan', 'Montserrat', sans-serif;
+  --font-display: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, 'Courier New', monospace;
+
+  /* Font Scales (Expanded & Increased for High Legibility) */
+  --text-3xs: 0.6875rem;  /* 11px */
+  --text-2xs: 0.75rem;    /* 12px */
+  --text-xs: 0.8125rem;   /* 13px */
+  --text-sm: 0.875rem;    /* 14px */
+  --text-base: 0.9375rem; /* 15px */
+  --text-md: 1.0625rem;   /* 17px */
+  --text-lg: 1.1875rem;   /* 19px */
+  --text-xl: 1.375rem;    /* 22px */
+  --text-2xl: 1.625rem;   /* 26px */
+  --text-3xl: 2.125rem;   /* 34px */
+
+  /* Typographic Tracking & Letter-Spacing Tokens for Montserrat */
+  --tracking-tightest: -0.02em;
+  --tracking-tighter: -0.01em;
+  --tracking-tight: -0.005em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.02em;
+  --tracking-wider: 0.035em;
+  --tracking-widest: 0.05em;
+
+  /* Typographic Weight Hierarchy */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Line Heights (Spacious & Breathable) */
+  --lh-none: 1.0;
+  --lh-tight: 1.2;
+  --lh-snug: 1.38;
+  --lh-normal: 1.55;
+  --lh-relaxed: 1.7;
+
+  /* Spacing Scale (Expanded for Breathing Room) */
+  --space-3xs: 0.25rem;   /* 4px */
+  --space-2xs: 0.375rem;  /* 6px */
+  --space-xs: 0.5rem;     /* 8px */
+  --space-sm: 0.75rem;    /* 12px */
+  --space-md: 1rem;       /* 16px */
+  --space-lg: 1.25rem;    /* 20px */
+  --space-xl: 1.5rem;     /* 24px */
+  --space-2xl: 2rem;      /* 32px */
+  --space-3xl: 2.5rem;    /* 40px */
+
+  /* Micro-Geometry & Corner Radii */
+  --radius-micro: 3px;
+  --radius-base: 6px;
+  --radius-card: 6px;
+  --radius-pill: 9999px;
+
+  /* Tactical Motion Timings & Easings */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-immediate: 100ms;
+  --dur-short: 180ms;
+  --dur-medium: 260ms;
+
+  /* Layout Constants (Roomier Control Bars) */
+  --nav-rail-width: 98px;
+  --header-height: 58px;
+  --top-bar-height: 58px;
+  --control-bar-height: 50px;
+  --corridor-bar-height: 50px;
+  --inspector-width: 440px;
+}
+

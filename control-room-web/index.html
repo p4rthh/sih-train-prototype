@@ -1,0 +1,2655 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <script>window.selectTrain=function(t,o=true){if(window._liveSelectTrain)return window._liveSelectTrain(t,o);};</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NavaRail Operations Control — Western Trunk &amp; Northern Corridor</title>
+  
+  <!-- Fonts: Montserrat (Modern Clean UI) + JetBrains Mono (Telemetry & Tabular Figures) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  
+  <!-- Leaflet Tactical GIS Map Styles & Engine -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Locked Design System Tokens & Stylesheet -->
+  <link rel="stylesheet" href="tokens.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="scada-app-layout">
+    
+    <!-- =====================================================================
+         1. LEFT SIDE NAV RAIL (72px) — Stitch Design System
+         ===================================================================== -->
+    <nav class="side-nav-rail" aria-label="Section Navigation">
+      <div class="nav-brand">
+        <span class="brand-sub">NAVARAIL</span>
+        <span class="brand-loc-tag" id="side-brand-loc">MMCT-CTC</span>
+      </div>
+
+      <div class="nav-menu">
+        <button class="nav-item active" data-view="overview" title="Corridor Overview Cockpit">
+          <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
+          <span class="nav-label">Overview</span>
+        </button>
+
+        <button class="nav-item" data-view="interlocking" title="CTC Interlocking Topology & Electronic Switches">
+          <span class="material-symbols-outlined" aria-hidden="true">alt_route</span>
+          <span class="nav-label">Interlocking</span>
+        </button>
+
+        <button class="nav-item" data-view="gis" title="Live Tactical GIS Railway Map">
+          <span class="material-symbols-outlined" aria-hidden="true">map</span>
+          <span class="nav-label">GIS Map</span>
+        </button>
+
+        <button class="nav-item" data-view="delay-intel" title="Dynamic Delay Intelligence Console">
+          <span class="material-symbols-outlined" aria-hidden="true">psychology</span>
+          <span class="nav-label">Delay Intel</span>
+        </button>
+
+        <button class="nav-item has-badge" data-view="alerts" title="Alert &amp; Disruption Hub">
+          <span class="nav-badge-dot" aria-hidden="true"></span>
+          <span class="material-symbols-outlined" aria-hidden="true">emergency</span>
+          <span class="nav-label">Alerts</span>
+        </button>
+
+        <button class="nav-item" data-view="dead-reckoning" title="Dead-Reckoning &amp; Edge Telemetry">
+          <span class="material-symbols-outlined" aria-hidden="true">satellite_alt</span>
+          <span class="nav-label">Telemetry</span>
+        </button>
+
+        <button class="nav-item" data-view="trains" title="Master Train Movements Roster">
+          <span class="material-symbols-outlined" aria-hidden="true">directions_railway</span>
+          <span class="nav-label">Trains</span>
+        </button>
+      </div>
+
+      <div class="nav-bottom">
+        <button class="nav-item" data-view="settings" title="Divisional Jurisdiction, Section Units &amp; Roster">
+          <span class="material-symbols-outlined" aria-hidden="true">account_tree</span>
+          <span class="nav-label">Jurisdiction</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- =====================================================================
+         2. MAIN VIEWPORT (Right of Nav Rail)
+         ===================================================================== -->
+    <div class="main-content-wrapper">
+      
+      <!-- Top App Bar (52px) -->
+      <header class="top-app-bar" role="banner">
+        <div class="top-left">
+          <div class="brand-logotype">
+            <span class="logo-bold">NAVARAIL</span>
+          </div>
+          <div class="top-divider" aria-hidden="true"></div>
+          <h1 class="section-title" id="top-corridor-title">MUMBAI DIVISION — WESTERN RAILWAY CTC</h1>
+          <div class="shift-chip">
+            <span class="pulse-indicator" aria-hidden="true"></span>
+            <span class="shift-text" id="top-shift-text">SHIFT B (14:00 IST) — CHC: T. BHATT • DESK-01: S. KUMAR</span>
+          </div>
+          <span class="corridor-badge" id="top-corridor-badge">0–1400 KM • 4 SECTION UNITS • KAVACH SIL-4 • RTIS/COA ACTIVE</span>
+        </div>
+
+        <div class="top-right">
+          <div class="telemetry-clock-card">
+            <span class="material-symbols-outlined clock-icon" aria-hidden="true">schedule</span>
+            <span class="clock-digits" id="live-clock">14:45:00</span>
+            <span class="clock-tz">IST</span>
+            <span class="clock-utc-sep">|</span>
+            <span class="clock-utc" id="live-utc">UTC 09:15:00</span>
+          </div>
+
+          <div class="quick-tools">
+            <button class="tool-btn" id="btn-audio-toggle" title="Toggle Alarm Chimes" aria-label="Toggle Alarm Chimes">
+              <span class="material-symbols-outlined" aria-hidden="true">volume_up</span>
+            </button>
+            <button class="tool-btn" id="btn-refresh-state" title="Force SCADA Poll (50Hz)" aria-label="Force SCADA Poll">
+              <span class="material-symbols-outlined" aria-hidden="true">sync</span>
+            </button>
+            <button class="tool-btn" id="btn-help-modal" title="Corridor Hotkeys (F2/F3/F4/Esc)" aria-label="Help and Shortcuts">
+              <span class="material-symbols-outlined" aria-hidden="true">help_outline</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- =================================================================
+           VIEW 1: OVERVIEW DASHBOARD (Stitch Final Clean Command View)
+           ================================================================= -->
+      <section class="content-view active" id="view-overview" aria-labelledby="overview-heading">
+        <h2 id="overview-heading" class="sr-only">Corridor Operations Overview</h2>
+
+        <!-- Tactical Corridor Control Bar (Stitch Screen e23f6d12b5ac4f8eaaba2e3ae4bcbda9) -->
+        <nav class="corridor-control-bar" aria-label="Tactical Corridor Controls">
+          <div class="control-group-left">
+            <!-- Sector Selector -->
+            <div class="sector-select-wrapper">
+              <span class="material-symbols-outlined select-icon text-cyan" aria-hidden="true">account_tree</span>
+              <select id="jurisdiction-selector" class="sector-dropdown" aria-label="Select Rail Jurisdiction or Section">
+                <option value="ALL">🌐 ALL JURISDICTIONS (Full Corridor • 8 Trains)</option>
+                <option value="MUMBAI">🏢 MUMBAI DIVISION (Western Railway • MMCT-CTC)</option>
+                <option value="WR-S1">⚡ WR-S1: MMCT–BRC Suburban &amp; Main (DESK-01 • S. Kumar)</option>
+                <option value="WR-S2">⛰️ WR-S2: BRC–RTM Ghat Section (DESK-02 • P. Nair)</option>
+                <option value="WR-S3">🛤️ WR-S3: RTM–KOTA Plateau Corridor (DESK-03 • A. Desai)</option>
+                <option value="NR-S4">🏛️ NR-S4: KOTA–NDLS Northern Trunk (DESK-04 • R. Verma)</option>
+              </select>
+              <span class="material-symbols-outlined sector-select-chevron" aria-hidden="true">expand_more</span>
+            </div>
+
+            <!-- Auto-Dispatch Online Status -->
+            <div class="auto-dispatch-chip">
+              <span class="status-dot-pulse" aria-hidden="true"></span>
+              <span class="auto-dispatch-text">AUTO-DISPATCH ONLINE</span>
+            </div>
+          </div>
+
+          <!-- Track Filter Pills -->
+          <div class="track-filter-group" role="group" aria-label="Filter tracks">
+            <button class="track-pill-btn active" data-track-filter="all">ALL TRACKS (4)</button>
+            <button class="track-pill-btn" data-track-filter="up">UP MAIN (NDLS)</button>
+            <button class="track-pill-btn" data-track-filter="dn">DN MAIN (GZB)</button>
+            <button class="track-pill-btn" data-track-filter="bypass">DFCC FREIGHT</button>
+            <button class="track-pill-btn" data-track-filter="loop">LOOP &amp; SIDING</button>
+          </div>
+
+          <!-- Operational Dispatch Mode Switcher -->
+          <div class="dispatch-mode-switcher" role="group" aria-label="Dispatch Autonomy Mode">
+            <button class="mode-switch-btn active" data-mode="auto" title="Automated Headway Regulation">
+              <span class="material-symbols-outlined" aria-hidden="true">neurology</span>
+              <span>AUTO REGULATION</span>
+            </button>
+            <button class="mode-switch-btn" data-mode="supervised" title="Controller Approval Required">
+              <span>SUPERVISED</span>
+            </button>
+            <button class="mode-switch-btn text-danger-hover" data-mode="restricted" title="Manual Line Clear Only">
+              <span>RESTRICTED</span>
+            </button>
+          </div>
+
+          <!-- Simulation Time Horizon & E-Stop -->
+          <div class="control-group-right">
+            <div class="horizon-pills-wrap" role="group" aria-label="Time Horizon Projection">
+              <span class="material-symbols-outlined horizon-icon" aria-hidden="true">update</span>
+              <button class="horizon-btn active" data-horizon="live">LIVE</button>
+              <span class="horizon-sep">/</span>
+              <button class="horizon-btn" data-horizon="15">+15m</button>
+              <span class="horizon-sep">/</span>
+              <button class="horizon-btn" data-horizon="30">+30m</button>
+              <span class="horizon-sep">/</span>
+              <button class="horizon-btn text-cyan" data-horizon="60">+60m Forecast</button>
+            </div>
+
+            <button class="btn-tactical-csv" id="btn-quick-export" title="Export Live Telemetry CSV">
+              <span class="material-symbols-outlined" aria-hidden="true">download</span>
+              <span>CSV</span>
+            </button>
+
+            <button class="btn-tactical-estop" id="btn-estop-hold" title="Enforce Corridor Emergency Stop Hold">
+              <span class="material-symbols-outlined" aria-hidden="true">dangerous</span>
+              <span>E-STOP HOLD</span>
+            </button>
+          </div>
+        </nav>
+        
+        <!-- 6-Card High-Density KPI Metrics Strip (Stitch Final Design) -->
+        <div class="kpi-metrics-strip" role="region" aria-label="Key Performance Indicators">
+          
+          <!-- KPI 1: Active Consists -->
+          <div class="kpi-card">
+            <div class="kpi-card-header">
+              <span class="kpi-label">ACTIVE CONSISTS</span>
+              <span class="material-symbols-outlined kpi-icon text-cyan" aria-hidden="true">train</span>
+            </div>
+            <div class="kpi-card-body">
+              <div class="kpi-value-row">
+                <span class="kpi-main-val font-mono">42</span>
+                <span class="kpi-badge-pill pill-nominal">+4 PEAK</span>
+              </div>
+              <div class="kpi-subtext">
+                <span>31 Passenger</span>
+                <span class="kpi-sub-sep" aria-hidden="true">•</span>
+                <span>11 Freight</span>
+              </div>
+            </div>
+            <!-- Sparkline -->
+            <div class="kpi-sparkline" aria-hidden="true">
+              <span style="height: 35%;"></span>
+              <span style="height: 48%;"></span>
+              <span style="height: 60%;"></span>
+              <span style="height: 75%;"></span>
+              <span style="height: 100%;"></span>
+              <span style="height: 82%;"></span>
+              <span style="height: 90%;"></span>
+              <span style="height: 95%;"></span>
+            </div>
+          </div>
+
+          <!-- KPI 2: On-Time Performance (OTP) -->
+          <div class="kpi-card">
+            <div class="kpi-card-header">
+              <span class="kpi-label">OTP CORRIDOR</span>
+              <span class="material-symbols-outlined kpi-icon text-nominal" aria-hidden="true">timer</span>
+            </div>
+            <div class="kpi-card-body">
+              <div class="kpi-value-row">
+                <span class="kpi-main-val font-mono text-nominal">98.4%</span>
+                <span class="kpi-badge-pill pill-nominal">NOMINAL</span>
+              </div>
+              <div class="kpi-subtext">
+                <span>Target: &ge;98.0%</span>
+                <span class="text-nominal font-mono">+0.6%</span>
+              </div>
+            </div>
+            <!-- Linear Progress Meter -->
+            <div class="kpi-linear-bar" aria-hidden="true">
+              <div class="kpi-bar-fill bg-nominal" style="width: 98.4%;"></div>
+            </div>
+          </div>
+
+          <!-- KPI 3: Freight Throughput -->
+          <div class="kpi-card">
+            <div class="kpi-card-header">
+              <span class="kpi-label">THROUGHPUT</span>
+              <span class="material-symbols-outlined kpi-icon text-cyan" aria-hidden="true">speed</span>
+            </div>
+            <div class="kpi-card-body">
+              <div class="kpi-value-row">
+                <span class="kpi-main-val font-mono">148.6</span>
+                <span class="kpi-unit">MGT-km</span>
+              </div>
+              <div class="kpi-subtext">
+                <span>Avg Velocity: <span class="font-mono text-cyan font-semibold">114 km/h</span></span>
+              </div>
+            </div>
+            <div class="kpi-linear-bar" aria-hidden="true">
+              <div class="kpi-bar-fill bg-cyan" style="width: 78%;"></div>
+            </div>
+          </div>
+
+          <!-- KPI 4: Mean Headway -->
+          <div class="kpi-card">
+            <div class="kpi-card-header">
+              <span class="kpi-label">MEAN HEADWAY</span>
+              <span class="material-symbols-outlined kpi-icon text-caution" aria-hidden="true">social_distance</span>
+            </div>
+            <div class="kpi-card-body">
+              <div class="kpi-value-row">
+                <span class="kpi-main-val font-mono text-caution">3m 12s</span>
+                <span class="kpi-badge-pill pill-caution">DENSE</span>
+              </div>
+              <div class="kpi-subtext">
+                <span>Safety Buffer: <span class="font-mono">2m 45s Limit</span></span>
+              </div>
+            </div>
+            <div class="kpi-linear-bar" aria-hidden="true">
+              <div class="kpi-bar-fill bg-caution" style="width: 84%;"></div>
+            </div>
+          </div>
+
+          <!-- KPI 5: AI Mitigated Delay -->
+          <div class="kpi-card">
+            <div class="kpi-card-header">
+              <span class="kpi-label">RECOVERED DELAY</span>
+              <span class="material-symbols-outlined kpi-icon text-ai" aria-hidden="true">insights</span>
+            </div>
+            <div class="kpi-card-body">
+              <div class="kpi-value-row">
+                <span class="kpi-main-val font-mono text-cyan">47.5m</span>
+                <span class="kpi-badge-pill pill-ai">SAVED</span>
+              </div>
+              <div class="kpi-subtext">
+                <span>18 Auto-Reroutes Executed</span>
+              </div>
+            </div>
+            <div class="kpi-linear-bar" aria-hidden="true">
+              <div class="kpi-bar-fill bg-ai" style="width: 92%;"></div>
+            </div>
+          </div>
+
+          <!-- KPI 6: Interlocking Health -->
+          <div class="kpi-card">
+            <div class="kpi-card-header">
+              <span class="kpi-label">INTERLOCKING</span>
+              <span class="material-symbols-outlined kpi-icon text-caution" aria-hidden="true">warning</span>
+            </div>
+            <div class="kpi-card-body">
+              <div class="kpi-value-row">
+                <span class="kpi-main-val font-mono text-caution">2 CAUTIONS</span>
+              </div>
+              <div class="kpi-subtext truncate">
+                <span>TC-09 DESYNC · PM-04</span>
+              </div>
+            </div>
+            <div class="kpi-tag-row">
+              <span class="kpi-micro-tag tag-caution">MAINT-1</span>
+              <span class="kpi-micro-tag tag-danger">FLUTTER</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Module 1: CTC Interlocking Topology & Interactive Schematic Viewport -->
+        <div class="module-card track-schematic-module">
+          <div class="module-header">
+            <div class="module-title-group">
+              <span class="material-symbols-outlined header-icon" aria-hidden="true">alt_route</span>
+              <h3 class="module-title">CTC INTERLOCKING TOPOLOGY · NDLS–GZB CORRIDOR</h3>
+              <span class="corridor-coord-chip">MP 0.0 &rarr; MP 28.6 · 4-ASPECT CAB-SIGNAL · 25kV 50Hz CATENARY</span>
+            </div>
+            <div class="module-header-meta">
+              <div class="block-legend-row" aria-label="Block status legend">
+                <span class="legend-pill clear"><i class="sq" aria-hidden="true"></i> Clear (7)</span>
+                <span class="legend-pill occupied"><i class="sq" aria-hidden="true"></i> Occupied (3)</span>
+                <span class="legend-pill locked"><i class="sq" aria-hidden="true"></i> Route Locked (1)</span>
+                <span class="legend-pill synthetic"><i class="sq" aria-hidden="true"></i> Regulated Block (1)</span>
+                <span class="legend-pill fault"><i class="sq" aria-hidden="true"></i> Sensor Fault (1)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Clean Horizontal Track Schematic SVG -->
+          <div class="schematic-viewport" tabindex="0" role="region" aria-label="Interactive track schematic diagram">
+            <svg id="schematic-svg" viewBox="0 0 1380 240" preserveAspectRatio="xMidYMid meet" aria-label="Track schematic">
+              <defs>
+                <filter id="card-shadow" x="-10%" y="-10%" width="120%" height="120%">
+                  <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.6"/>
+                </filter>
+                <filter id="glow-green" x="-50%" y="-50%" width="200%" height="200%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#10b981" flood-opacity="0.8"/>
+                </filter>
+                <filter id="glow-cyan" x="-50%" y="-50%" width="200%" height="200%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#f59e0b" flood-opacity="0.8"/>
+                </filter>
+                <filter id="glow-amber" x="-50%" y="-50%" width="200%" height="200%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#f59e0b" flood-opacity="0.8"/>
+                </filter>
+                <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="2.5" flood-color="#ef4444" flood-opacity="0.9"/>
+                </filter>
+              </defs>
+
+              <!-- Station Guideline Columns & Distances -->
+              <g class="station-grid" id="ei-station-grid" font-family="Montserrat, sans-serif" font-size="9" fill="#64748b">
+                <line x1="80" y1="26" x2="80" y2="210" stroke="#252932" stroke-dasharray="2,3" />
+                <line x1="250" y1="26" x2="250" y2="210" stroke="#252932" stroke-dasharray="2,3" />
+                <line x1="420" y1="26" x2="420" y2="210" stroke="#252932" stroke-dasharray="2,3" />
+                <line x1="750" y1="26" x2="750" y2="210" stroke="#252932" stroke-dasharray="2,3" />
+                <line x1="1060" y1="26" x2="1060" y2="210" stroke="#252932" stroke-dasharray="2,3" />
+                <line x1="1300" y1="26" x2="1300" y2="210" stroke="#252932" stroke-dasharray="2,3" />
+
+                <!-- Station Names with KM Markers -->
+                <text x="80" y="20" text-anchor="middle" fill="#f1f5f9" font-weight="700">NEW DELHI (KM 0.0)</text>
+                <text x="250" y="20" text-anchor="middle" fill="#94a3b8" font-weight="600">CSB (KM 2.3)</text>
+                <text x="420" y="20" text-anchor="middle" fill="#94a3b8" font-weight="600">TKJ (KM 4.1)</text>
+                <text x="750" y="20" text-anchor="middle" fill="#f1f5f9" font-weight="700">ANAND VIHAR (KM 13.8)</text>
+                <text x="1060" y="20" text-anchor="middle" fill="#94a3b8" font-weight="600">SAHIBABAD (KM 22.4)</text>
+                <text x="1300" y="20" text-anchor="middle" fill="#f1f5f9" font-weight="700">GHAZIABAD (KM 28.6)</text>
+              </g>
+
+              <!-- UP MAIN LINE (Track at Y = 76, Labels at Y = 48) -->
+              <g id="schematic-up-line">
+                <text x="12" y="80" font-family="Montserrat, sans-serif" font-size="9" font-weight="700" fill="#94a3b8" letter-spacing="0.5">UP MAIN &#x25C0;</text>
+                <!-- Base Rail Track -->
+                <line x1="70" y1="76" x2="1330" y2="76" stroke="#252932" stroke-width="5" stroke-linecap="round" />
+
+                <!-- Blocks TC-01 to TC-06 -->
+                <g class="block-click" onclick="selectBlock('TC-01')" cursor="pointer" role="button" aria-label="Block TC-01">
+                  <line x1="80" y1="76" x2="270" y2="76" stroke="#10b981" stroke-width="3.5" />
+                  <text x="175" y="48" font-family="Montserrat, monospace" font-size="8.5" font-weight="600" fill="#10b981" text-anchor="middle">TC-01</text>
+                  <circle cx="85" cy="48" r="3.5" fill="#10b981" filter="url(#glow-green)" />
+                </g>
+
+                <g class="block-click" onclick="selectBlock('TC-02')" cursor="pointer" role="button" aria-label="Block TC-02">
+                  <line x1="275" y1="76" x2="480" y2="76" stroke="#475569" stroke-width="3" />
+                  <text x="377" y="48" font-family="Montserrat, monospace" font-size="8.5" font-weight="600" fill="#64748b" text-anchor="middle">TC-02</text>
+                  <circle cx="280" cy="48" r="3.5" fill="#f59e0b" filter="url(#glow-amber)" />
+                </g>
+
+                <!-- TC-03: Occupied by 12951 Rajdhani (Block Label at Y=48, Badge at Y=64) -->
+                <g class="block-click" onclick="selectTrain('12951')" cursor="pointer" role="button" aria-label="Train 12951 at Block TC-03">
+                  <line x1="485" y1="76" x2="690" y2="76" stroke="#10b981" stroke-width="4.5" />
+                  <text x="587" y="48" font-family="Montserrat, monospace" font-size="9" fill="#10b981" font-weight="700" text-anchor="middle">TC-03 [OCCUPIED]</text>
+                  <circle cx="490" cy="48" r="3.5" fill="#10b981" filter="url(#glow-green)" />
+                  <!-- Train Pill (Centered vertically on track Y=76) -->
+                  <g class="train-schematic-tag" transform="translate(540, 64)" filter="url(#card-shadow)">
+                    <rect x="0" y="0" width="94" height="24" rx="4" fill="#15181d" stroke="#10b981" stroke-width="1.8" />
+                    <text x="8" y="16" font-family="Montserrat, monospace" font-size="9.5" font-weight="700" fill="#10b981">&#x25C0; 12951</text>
+                    <text x="64" y="16" font-family="Montserrat, monospace" font-size="8.5" font-weight="600" fill="#94a3b8">112k</text>
+                  </g>
+                </g>
+
+                <g class="block-click" onclick="selectBlock('TC-04')" cursor="pointer" role="button" aria-label="Block TC-04">
+                  <line x1="695" y1="76" x2="900" y2="76" stroke="#475569" stroke-width="3" />
+                  <text x="797" y="48" font-family="Montserrat, monospace" font-size="8.5" font-weight="600" fill="#64748b" text-anchor="middle">TC-04</text>
+                  <circle cx="700" cy="48" r="3.5" fill="#10b981" filter="url(#glow-green)" />
+                </g>
+
+                <!-- TC-05: Route Locked by Freight BOXN-609 -->
+                <g class="block-click" onclick="selectBlock('TC-05')" cursor="pointer" role="button" aria-label="Block TC-05 Locked">
+                  <line x1="905" y1="76" x2="1110" y2="76" stroke="#f59e0b" stroke-width="3.5" stroke-dasharray="5,2" />
+                  <text x="1007" y="48" font-family="Montserrat, monospace" font-size="8.5" font-weight="600" fill="#f59e0b" text-anchor="middle">TC-05 [LOCKED]</text>
+                  <circle cx="910" cy="48" r="3.5" fill="#f59e0b" filter="url(#glow-amber)" />
+                </g>
+
+                <g class="block-click" onclick="selectBlock('TC-06')" cursor="pointer" role="button" aria-label="Block TC-06">
+                  <line x1="1115" y1="76" x2="1320" y2="76" stroke="#475569" stroke-width="3" />
+                  <text x="1217" y="48" font-family="Montserrat, monospace" font-size="8.5" font-weight="600" fill="#64748b" text-anchor="middle">TC-06</text>
+                  <circle cx="1120" cy="48" r="3.5" fill="#10b981" filter="url(#glow-green)" />
+                </g>
+              </g>
+
+              <!-- Crossover Switches (SW-10 to SW-16) -->
+              <g class="crossover-tracks" stroke="#334155" stroke-width="2" stroke-dasharray="3,3">
+                <line x1="190" y1="76" x2="235" y2="150" />
+                <line x1="1000" y1="76" x2="1045" y2="150" />
+              </g>
+
+              <!-- DOWN MAIN LINE (Track at Y = 150, Badges at Y = 138, Block Labels at Y = 186) -->
+              <g id="schematic-dn-line">
+                <text x="12" y="154" font-family="Montserrat, sans-serif" font-size="9" font-weight="700" fill="#94a3b8" letter-spacing="0.5">DN MAIN &#x25B6;</text>
+                <line x1="70" y1="150" x2="1330" y2="150" stroke="#252932" stroke-width="5" stroke-linecap="round" />
+
+                <!-- TC-07: AI Synthetic Dispatch (12436 ASR Shatabdi) -->
+                <g class="block-click" onclick="selectTrain('12436')" cursor="pointer" role="button" aria-label="Train 12436 at Block TC-07">
+                  <line x1="80" y1="150" x2="270" y2="150" stroke="#ea580c" stroke-width="3.5" stroke-dasharray="5,2" />
+                  <g class="train-schematic-tag" transform="translate(130, 138)" filter="url(#card-shadow)">
+                    <rect x="0" y="0" width="90" height="24" rx="4" fill="#15181d" stroke="#ea580c" stroke-width="1.8" />
+                    <text x="8" y="16" font-family="Montserrat, monospace" font-size="9.5" font-weight="700" fill="#ea580c">12436 &#x25B6;</text>
+                    <text x="60" y="16" font-family="Montserrat, monospace" font-size="8.5" font-weight="600" fill="#94a3b8">87k</text>
+                  </g>
+                  <text x="175" y="186" font-family="Montserrat, monospace" font-size="8.5" font-weight="600" fill="#ea580c" text-anchor="middle">TC-07 [REG]</text>
+                  <circle cx="85" cy="186" r="3.5" fill="#ea580c" />
+                </g>
+
+                <!-- TC-08: Emergency Brake (22222 Vande Bharat) -->
+                <g class="block-click" onclick="selectTrain('22222')" cursor="pointer" role="button" aria-label="Train 22222 Emergency Brake at Block TC-08">
+                  <line x1="275" y1="150" x2="495" y2="150" stroke="#ef4444" stroke-width="4.5" />
+                  <g class="train-schematic-tag" transform="translate(338, 138)" filter="url(#card-shadow)">
+                    <rect x="0" y="0" width="102" height="24" rx="4" fill="#1d1215" stroke="#ef4444" stroke-width="2" />
+                    <text x="8" y="16" font-family="Montserrat, monospace" font-size="9.5" font-weight="700" fill="#ef4444">22222 &#x1F6D1;</text>
+                    <text x="72" y="16" font-family="Montserrat, monospace" font-size="8.5" font-weight="700" fill="#ef4444">0km</text>
+                  </g>
+                  <text x="385" y="186" font-family="Montserrat, monospace" font-size="9" font-weight="700" fill="#ef4444" text-anchor="middle">TC-08 [EMG BRAKE]</text>
+                  <circle cx="280" cy="186" r="3.5" fill="#ef4444" filter="url(#glow-red)" />
+                </g>
+
+                <!-- TC-09: Phantom Drop / Fault -->
+                <g class="block-click" onclick="selectBlock('TC-09')" cursor="pointer" role="button" aria-label="Block TC-09 Sensor Fault">
+                  <line x1="500" y1="150" x2="710" y2="150" stroke="#f59e0b" stroke-width="3" stroke-dasharray="2,2" />
+                  <text x="605" y="186" font-family="Montserrat, monospace" font-size="8.5" font-weight="600" fill="#f59e0b" text-anchor="middle">TC-09 [DESYNC]</text>
+                  <circle cx="505" cy="186" r="3.5" fill="#f59e0b" filter="url(#glow-amber)" />
+                </g>
+
+                <g class="block-click" onclick="selectBlock('TC-10')" cursor="pointer" role="button" aria-label="Block TC-10">
+                  <line x1="715" y1="150" x2="920" y2="150" stroke="#475569" stroke-width="3" />
+                  <text x="817" y="186" font-family="Montserrat, monospace" font-size="8.5" font-weight="600" fill="#64748b" text-anchor="middle">TC-10</text>
+                  <circle cx="720" cy="186" r="3.5" fill="#10b981" filter="url(#glow-green)" />
+                </g>
+
+                <!-- TC-11: Occupied by 12302 Howrah Rajdhani -->
+                <g class="block-click" onclick="selectTrain('12302')" cursor="pointer" role="button" aria-label="Train 12302 at Block TC-11">
+                  <line x1="925" y1="150" x2="1120" y2="150" stroke="#ef4444" stroke-width="4.5" />
+                  <g class="train-schematic-tag" transform="translate(974, 138)" filter="url(#card-shadow)">
+                    <rect x="0" y="0" width="94" height="24" rx="4" fill="#15181d" stroke="#f59e0b" stroke-width="1.8" />
+                    <text x="8" y="16" font-family="Montserrat, monospace" font-size="9.5" font-weight="700" fill="#f59e0b">12302 &#x25B6;</text>
+                    <text x="64" y="16" font-family="Montserrat, monospace" font-size="8.5" font-weight="600" fill="#94a3b8">98k</text>
+                  </g>
+                  <text x="1022" y="186" font-family="Montserrat, monospace" font-size="8.5" font-weight="700" fill="#f59e0b" text-anchor="middle">TC-11 [+14m DELAY]</text>
+                  <circle cx="930" cy="186" r="3.5" fill="#ef4444" filter="url(#glow-red)" />
+                </g>
+
+                <g class="block-click" onclick="selectBlock('TC-12')" cursor="pointer" role="button" aria-label="Block TC-12">
+                  <line x1="1125" y1="150" x2="1320" y2="150" stroke="#475569" stroke-width="3" />
+                  <text x="1222" y="186" font-family="Montserrat, monospace" font-size="8.5" font-weight="600" fill="#64748b" text-anchor="middle">TC-12</text>
+                  <circle cx="1130" cy="186" r="3.5" fill="#10b981" filter="url(#glow-green)" />
+                </g>
+              </g>
+
+              <!-- Footer Sector Labels inside SVG (Cleanly spaced at Y = 216) -->
+              <g font-family="Montserrat, sans-serif" font-size="8.5" font-weight="600" fill="#64748b" letter-spacing="0.4">
+                <text x="80" y="216" text-anchor="start">NDLS PLATFORMS 1-16</text>
+                <text x="385" y="216" text-anchor="middle">YAMUNA RIVER BRIDGE</text>
+                <text x="750" y="216" text-anchor="middle">ANAND VIHAR INTERCHANGE</text>
+                <text x="1060" y="216" text-anchor="middle">SAHIBABAD JUNCTION</text>
+                <text x="1300" y="216" text-anchor="end">GZB YARD JUNCTION</text>
+              </g>
+            </svg>
+          </div>
+
+          <!-- AI Co-Dispatch Advisory Strip (Stitch Screen Final) -->
+          <div class="ai-advisory-strip" role="region" aria-label="AI Co-Dispatch Recommendation">
+            <div class="ai-advisory-left">
+              <div class="ai-advisory-tag">
+                <span class="material-symbols-outlined" aria-hidden="true">smart_toy</span>
+                <span>AUTOMATED DISPATCH ADVISORY</span>
+              </div>
+              <p class="ai-advisory-text">
+                Hold <strong class="text-caution font-mono">12302 Howrah Rajdhani</strong> at Anand Vihar (MP 13.8) for 40s coasting to clear <strong class="text-nominal font-mono">12951 Mumbai Rajdhani</strong> interlocking priority on UP Fast. Saves <span class="text-nominal font-bold font-mono">+4.2m</span> downstream corridor delay.
+              </p>
+            </div>
+            <div class="ai-advisory-actions">
+              <button class="btn-advisory-accept" id="btn-advisory-accept" title="Accept Recommendation (HotKey F2)">
+                <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                <span>[F2] ACCEPT</span>
+              </button>
+              <button class="btn-advisory-override" id="btn-advisory-override" title="Override Recommendation (HotKey F3)">
+                <span class="material-symbols-outlined" aria-hidden="true">cancel</span>
+                <span>[F3] OVERRIDE</span>
+              </button>
+              <button class="btn-advisory-sim" id="btn-advisory-sim" title="Run Conformal Path Simulation (HotKey F4)">
+                <span class="material-symbols-outlined" aria-hidden="true">play_circle</span>
+                <span>[F4] SIM</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Module 2: Center Split Console (Live Trains Left + Alarms Right) -->
+        <div class="middle-split-row">
+          
+          <!-- Left: Live Trains Panel with Mode Switcher (Cards vs Table) -->
+          <div class="module-card train-operations-panel">
+            <div class="module-header">
+              <div class="module-title-group">
+                <span class="material-symbols-outlined header-icon" aria-hidden="true">directions_railway</span>
+                <h3 class="module-title">LIVE TRAIN MOVEMENTS</h3>
+                <span class="count-chip" id="train-monitored-count">4 ACTIVE IN SECTOR</span>
+              </div>
+              
+              <div class="panel-view-toggle" role="group" aria-label="Toggle train layout view">
+                <button class="view-toggle-btn active" id="toggle-cards-view" title="At-a-Glance Train Cards View">
+                  <span class="material-symbols-outlined" aria-hidden="true">grid_view</span>
+                  <span>Cards View</span>
+                </button>
+                <button class="view-toggle-btn" id="toggle-table-view" title="Dense Telemetry Table View">
+                  <span class="material-symbols-outlined" aria-hidden="true">table_rows</span>
+                  <span>Table View</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Territorial Jurisdiction Filter Strip -->
+            <div class="jurisdiction-scope-bar" style="background:var(--color-surface-subtle); border:1px solid var(--color-rule); border-radius:6px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span class="material-symbols-outlined text-cyan" style="font-size:22px;">filter_alt</span>
+                <div>
+                  <span style="display:block; font-size:10px; font-weight:600; color:var(--color-ink-muted); text-transform:uppercase; letter-spacing:0.04em;">LIVE JURISDICTION TRAIN FILTER</span>
+                  <h4 id="active-jurisdiction-name" style="margin:2px 0 0 0; font-size:13px; font-weight:600; letter-spacing:0.01em; color:var(--color-ink);">ALL JURISDICTIONS (8 LIVE TRAINS)</h4>
+                </div>
+              </div>
+              <div class="track-filter-group" id="jurisdiction-pills-group" role="group" aria-label="Filter by territorial section">
+                <button class="track-pill-btn active" data-jurisdiction-pill="ALL">ALL (8)</button>
+                <button class="track-pill-btn" data-jurisdiction-pill="MUMBAI">MUMBAI DIV</button>
+                <button class="track-pill-btn" data-jurisdiction-pill="WR-S1">WR-S1 (MMCT-BRC)</button>
+                <button class="track-pill-btn" data-jurisdiction-pill="WR-S2">WR-S2 (BRC-RTM)</button>
+                <button class="track-pill-btn" data-jurisdiction-pill="WR-S3">WR-S3 (RTM-KOTA)</button>
+                <button class="track-pill-btn" data-jurisdiction-pill="NR-S4">NR-S4 (KOTA-NDLS)</button>
+              </div>
+            </div>
+
+            <!-- Mode A: 2×2 Live Train Position Cards (Refined Hallmark Standard · No Side-Stripes) -->
+            <div class="train-cards-grid active" id="train-cards-container">
+              
+              <!-- Card 1: 12951 RAJDHANI EXP (On Time · Emerald) -->
+              <div class="train-card card-nominal" onclick="selectTrain('12951')" tabindex="0" role="button" aria-label="Train 12951 Rajdhani Express">
+                <div class="card-top-row">
+                  <div>
+                    <h4 class="card-train-num font-mono">12951</h4>
+                    <p class="card-train-name">RAJDHANI EXP (BCT &#10132; NDLS)</p>
+                  </div>
+                  <span class="status-chip chip-nominal">ON TIME</span>
+                </div>
+                <div class="card-metrics-grid">
+                  <div class="metric-cell">
+                    <span class="cell-label">SPEED</span>
+                    <span class="cell-value val-nominal font-mono">112 <span class="unit">KMPH</span></span>
+                  </div>
+                  <div class="metric-cell">
+                    <span class="cell-label">BLOCK</span>
+                    <span class="cell-value font-mono">TC-03</span>
+                  </div>
+                  <div class="metric-cell">
+                    <span class="cell-label">ETA CONF</span>
+                    <span class="cell-value font-mono text-cyan">99.8%</span>
+                  </div>
+                  <div class="metric-cell">
+                    <span class="cell-label">RAKE</span>
+                    <span class="cell-value font-mono text-dim">WAP-7 · 20 LHB</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 2: 12302 HOWRAH RAJDHANI (Delayed · Amber) -->
+              <div class="train-card card-caution" onclick="selectTrain('12302')" tabindex="0" role="button" aria-label="Train 12302 Howrah Rajdhani">
+                <div class="card-top-row">
+                  <div>
+                    <h4 class="card-train-num font-mono">12302</h4>
+                    <p class="card-train-name">HOWRAH RAJDHANI (NDLS &#10132; HWH)</p>
+                  </div>
+                  <span class="status-chip chip-caution">DELAYED</span>
+                </div>
+                <div class="card-metrics-grid">
+                  <div class="metric-cell">
+                    <span class="cell-label">SPEED</span>
+                    <span class="cell-value val-caution font-mono">98 <span class="unit">KMPH</span></span>
+                  </div>
+                  <div class="metric-cell">
+                    <span class="cell-label">DELAY</span>
+                    <span class="cell-value val-caution font-mono">+14 <span class="unit">MIN</span></span>
+                  </div>
+                  <div class="metric-cell">
+                    <span class="cell-label">BLOCK</span>
+                    <span class="cell-value font-mono">TC-11</span>
+                  </div>
+                  <div class="metric-cell">
+                    <span class="cell-label">RAKE</span>
+                    <span class="cell-value font-mono text-dim">WAP-7 · 22 LHB</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 3: 22222 VANDE BHARAT (Emergency Halt · Red) -->
+              <div class="train-card card-danger" onclick="selectTrain('22222')" tabindex="0" role="button" aria-label="Train 22222 Vande Bharat Emergency Halt">
+                <div class="card-top-row">
+                  <div>
+                    <h4 class="card-train-num font-mono">22222</h4>
+                    <p class="card-train-name">VANDE BHARAT (NDLS &#10132; BSB)</p>
+                  </div>
+                  <span class="status-chip chip-danger font-bold">EMERGENCY BRAKE</span>
+                </div>
+                <div class="card-metrics-grid">
+                  <div class="metric-cell alert-cell">
+                    <span class="cell-label text-danger">SPEED</span>
+                    <span class="cell-value val-danger font-mono">0 <span class="unit text-danger">KMPH</span></span>
+                  </div>
+                  <div class="metric-cell">
+                    <span class="cell-label">BLOCK</span>
+                    <span class="cell-value font-mono text-danger">TC-08</span>
+                  </div>
+                  <div class="metric-cell">
+                    <span class="cell-label">BRAKE PIPE</span>
+                    <span class="cell-value font-mono text-danger">2.1 kg/cm&sup2;</span>
+                  </div>
+                  <div class="metric-cell">
+                    <span class="cell-label">STATUS</span>
+                    <span class="cell-value font-mono text-danger">HALTED SBB</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 4: 12436 AMRITSAR SHATABDI (AI Inferred · Violet) -->
+              <div class="train-card card-ai" onclick="selectTrain('12436')" tabindex="0" role="button" aria-label="Train 12436 Amritsar Shatabdi">
+                <div class="card-top-row">
+                  <div>
+                    <h4 class="card-train-num font-mono">12436</h4>
+                    <p class="card-train-name">AMRITSAR SHATABDI (NDLS &#10132; ASR)</p>
+                  </div>
+                  <span class="status-chip chip-ai">EKF DEAD-RECKONING</span>
+                </div>
+                <div class="card-metrics-grid">
+                  <div class="metric-cell">
+                    <span class="cell-label">PROJ. SPEED</span>
+                    <span class="cell-value val-ai font-mono">87 <span class="unit">KMPH</span></span>
+                  </div>
+                  <div class="metric-cell">
+                    <span class="cell-label">TARGET BLOCK</span>
+                    <span class="cell-value font-mono">TC-07</span>
+                  </div>
+                  <div class="metric-cell">
+                    <span class="cell-label">ETA CONF</span>
+                    <span class="cell-value font-mono text-ai">91% &plusmn; 1.5m</span>
+                  </div>
+                  <div class="metric-cell">
+                    <span class="cell-label">RAKE</span>
+                    <span class="cell-value font-mono text-dim">WAP-5 · 14 LHB</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Mode B: Tabular Console (Seamlessly Toggled) -->
+            <div class="train-table-wrapper" id="train-table-container">
+              <table class="telemetry-table" id="overview-telemetry-table">
+                <thead>
+                  <tr>
+                    <th>TRAIN #</th>
+                    <th>NAME</th>
+                    <th>LINE</th>
+                    <th>ROUTE</th>
+                    <th>SCHED</th>
+                    <th>ACTUAL</th>
+                    <th>DELAY</th>
+                    <th class="text-right">SPEED</th>
+                    <th>BLOCK</th>
+                    <th>SIGNAL</th>
+                    <th>ACTION</th>
+                  </tr>
+                </thead>
+                <tbody id="overview-table-body">
+                  <!-- Populated dynamically via app.js -->
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+          <!-- Right: Dedicated Active Alarms Sidebar (Stitch 320px Design) -->
+          <div class="module-card active-alarms-panel">
+            <div class="module-header">
+              <div class="module-title-group">
+                <span class="material-symbols-outlined header-icon text-danger" aria-hidden="true">notifications_active</span>
+                <h3 class="module-title">ACTIVE ALARMS</h3>
+              </div>
+              <span class="alarm-count-badge" id="sidebar-alarm-count">7</span>
+            </div>
+
+            <!-- Scrollable Alarm Feed -->
+            <div class="alarm-list-scroll" id="sidebar-alarm-list" role="feed" aria-label="Live Alarm Feed">
+              <!-- Rendered via JS -->
+            </div>
+
+            <!-- Bottom Action -->
+            <button class="btn-ack-all" id="btn-ack-all-alarms">
+              <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">done_all</span>
+              <span>Acknowledge All Alarms</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Module 3: Bottom Section Metrics Bar (Stitch Design) -->
+        <footer class="section-metrics-footer" role="contentinfo">
+          <div class="metric-segment">
+            <span class="material-symbols-outlined metric-icon text-dim" aria-hidden="true">train</span>
+            <div>
+              <p class="metric-label">TRAINS IN SECTION</p>
+              <p class="metric-value font-mono">14</p>
+            </div>
+          </div>
+
+          <div class="divider-line" aria-hidden="true"></div>
+
+          <div class="metric-segment">
+            <span class="material-symbols-outlined metric-icon text-caution" aria-hidden="true">schedule</span>
+            <div>
+              <p class="metric-label">AVERAGE DELAY</p>
+              <p class="metric-value font-mono text-caution">+4.2 <span class="sub-unit">MIN</span></p>
+            </div>
+          </div>
+
+          <div class="divider-line" aria-hidden="true"></div>
+
+          <div class="metric-segment">
+            <span class="material-symbols-outlined metric-icon text-nominal" aria-hidden="true">route</span>
+            <div>
+              <p class="metric-label">TRACK UTILIZATION</p>
+              <p class="metric-value font-mono text-nominal">78%</p>
+            </div>
+          </div>
+
+          <div class="divider-line" aria-hidden="true"></div>
+
+          <div class="metric-segment">
+            <span class="material-symbols-outlined metric-icon text-nominal" aria-hidden="true">health_and_safety</span>
+            <div>
+              <p class="metric-label">SIGNAL HEALTH</p>
+              <p class="metric-value font-mono text-nominal">96.3%</p>
+            </div>
+          </div>
+
+          <div class="divider-line" aria-hidden="true"></div>
+
+          <div class="metric-segment">
+            <span class="material-symbols-outlined metric-icon text-cyan" aria-hidden="true">cell_tower</span>
+            <div>
+              <p class="metric-label">CORRIDOR FREQUENCY</p>
+              <p class="metric-value font-mono text-cyan">160.800 <span class="sub-unit">MHz LTE-R</span></p>
+            </div>
+          </div>
+        </footer>
+
+      </section>
+
+      <!-- =================================================================
+           VIEW: CTC INTERLOCKING TOPOLOGY & ROUTE CONTROL CONSOLE
+           ================================================================= -->
+      <section class="content-view" id="view-interlocking" aria-labelledby="interlocking-heading">
+        <h2 id="interlocking-heading" class="sr-only">CTC Interlocking Topology and Electronic Route Controls</h2>
+
+        <!-- Tactical Corridor Header Strip for Interlocking -->
+        <div class="module-card">
+          <div class="module-header">
+            <div class="module-title-group">
+              <span class="material-symbols-outlined header-icon text-cyan" aria-hidden="true">alt_route</span>
+              <div>
+                <h3 class="module-title">CTC INTERLOCKING TOPOLOGY &amp; VITAL ROUTE CONTROL</h3>
+                <p class="module-subtitle" id="ei-corridor-subtitle">NDLS–GZB 4-TRACK QUADRUPLE CORRIDOR · SIL-4 ELECTRONIC INTERLOCKING · KAVACH TCAS 1.2</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="btn-tactical-csv" id="btn-ei-auto-route" title="Toggle Auto-Route Setting">
+                <span class="material-symbols-outlined" style="font-size: 14px;" aria-hidden="true">smart_toy</span>
+                <span>AUTO-ROUTE: ACTIVE</span>
+              </button>
+              <button class="btn-tactical-csv" id="btn-ei-reprove" title="Force SCADA Interlocking Re-Prove">
+                <span class="material-symbols-outlined" style="font-size: 14px;" aria-hidden="true">sync</span>
+                <span>FORCE RE-PROVE</span>
+              </button>
+              <button class="btn-tactical-estop" id="btn-ei-erc" title="Emergency Route Cancel (SIL-4)">
+                <span class="material-symbols-outlined" style="font-size: 14px;" aria-hidden="true">lock_reset</span>
+                <span>EMERGENCY ROUTE CANCEL</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Section Corridor Selector Strip -->
+          <div class="interlocking-section-strip" id="ei-section-strip" style="display: flex; gap: 6px; padding: 6px 14px; background: var(--color-canvas-inset); border-bottom: 1px solid var(--color-rule); overflow-x: auto; align-items: center;"></div>
+
+          <!-- Interlocking High-Density Status Strip -->
+          <div class="interlocking-kpi-bar" style="padding: var(--space-sm) var(--space-md); background: var(--color-canvas-inset); border-bottom: 1px solid var(--color-rule);">
+            <div class="flex items-center justify-between p-2 bg-paper-card rounded border border-rule">
+              <div>
+                <span class="font-mono text-xs text-dim block">ACTIVE ROUTE LOCKS</span>
+                <span class="font-mono text-nominal font-bold text-sm" id="ei-kpi-locks">3 CONFIGURED</span>
+              </div>
+              <span class="material-symbols-outlined text-nominal" style="font-size: 20px;" aria-hidden="true">check_circle</span>
+            </div>
+            <div class="flex items-center justify-between p-2 bg-paper-card rounded border border-rule">
+              <div>
+                <span class="font-mono text-xs text-dim block">POINT MACHINES</span>
+                <span class="font-mono text-caution font-bold text-sm" id="ei-kpi-points">6 LOCKED (1 SLOW)</span>
+              </div>
+              <span class="material-symbols-outlined text-caution" style="font-size: 20px;" aria-hidden="true">published_with_changes</span>
+            </div>
+            <div class="flex items-center justify-between p-2 bg-paper-card rounded border border-rule">
+              <div>
+                <span class="font-mono text-xs text-dim block">SIGNAL HEADS</span>
+                <span class="font-mono text-cyan font-bold text-sm" id="ei-kpi-signals">12 CAB-MONITORED</span>
+              </div>
+              <span class="material-symbols-outlined text-cyan" style="font-size: 20px;" aria-hidden="true">traffic</span>
+            </div>
+            <div class="flex items-center justify-between p-2 bg-paper-card rounded border border-rule">
+              <div>
+                <span class="font-mono text-xs text-dim block">AXLE COUNTER SECTIONS</span>
+                <span class="font-mono text-caution font-bold text-sm" id="ei-kpi-axle">11 CLEAR / 1 DESYNC</span>
+              </div>
+              <span class="material-symbols-outlined text-caution" style="font-size: 20px;" aria-hidden="true">sensors</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Master Expanded CTC Track Topology Canvas -->
+        <div class="module-card interlocking-master-schematic">
+          <div class="module-header">
+            <div class="module-title-group">
+              <span class="material-symbols-outlined header-icon" aria-hidden="true">route</span>
+              <h3 class="module-title">EXPANDED CTC INTERLOCKING &amp; ELECTRONIC SWITCH MACHINE SCHEMATIC</h3>
+              <span class="corridor-coord-chip" id="ei-corridor-mp-chip">MP 0.0 &rarr; MP 28.6 · 4-TRACK REAL-TIME RELAY LOGIC</span>
+            </div>
+            <div class="block-legend-row" aria-label="Interlocking topology legend">
+              <span class="legend-pill clear"><i class="sq" aria-hidden="true"></i> Track Clear</span>
+              <span class="legend-pill occupied"><i class="sq" aria-hidden="true"></i> Occupied / E-Brake</span>
+              <span class="legend-pill locked"><i class="sq" aria-hidden="true"></i> Route Locked</span>
+              <span class="legend-pill synthetic"><i class="sq" aria-hidden="true"></i> Regulated Track</span>
+              <span class="legend-pill fault"><i class="sq" aria-hidden="true"></i> Sensor Desync (TC-09)</span>
+            </div>
+          </div>
+
+          <div class="interlocking-viewport" tabindex="0" role="region" aria-label="Expanded CTC track schematic diagram">
+            <svg id="interlocking-full-svg" viewBox="0 0 1600 300" preserveAspectRatio="xMidYMid meet" aria-label="Full CTC track topology">
+              <defs>
+                <filter id="ei-glow-green" x="-50%" y="-50%" width="200%" height="200%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#10b981" flood-opacity="0.9"/>
+                </filter>
+                <filter id="ei-glow-red" x="-50%" y="-50%" width="200%" height="200%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#ef4444" flood-opacity="0.9"/>
+                </filter>
+                <filter id="ei-glow-amber" x="-50%" y="-50%" width="200%" height="200%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#f59e0b" flood-opacity="0.9"/>
+                </filter>
+                <filter id="ei-glow-cyan" x="-50%" y="-50%" width="200%" height="200%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#f59e0b" flood-opacity="0.9"/>
+                </filter>
+                <filter id="ei-card-shadow" x="-10%" y="-10%" width="120%" height="120%">
+                  <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.7"/>
+                </filter>
+              </defs>
+
+              <!-- Station Guidelines & Kilometre Markers -->
+              <g class="station-grid" font-family="JetBrains Mono" font-size="9" fill="#64748b">
+                <g id="ei-station-lines-and-labels">
+                  <line x1="100" y1="25" x2="100" y2="280" stroke="#2d313a" stroke-dasharray="2,3" />
+                  <line x1="320" y1="25" x2="320" y2="280" stroke="#2d313a" stroke-dasharray="2,3" />
+                  <line x1="560" y1="25" x2="560" y2="280" stroke="#2d313a" stroke-dasharray="2,3" />
+                  <line x1="900" y1="25" x2="900" y2="280" stroke="#2d313a" stroke-dasharray="2,3" />
+                  <line x1="1250" y1="25" x2="1250" y2="280" stroke="#2d313a" stroke-dasharray="2,3" />
+                  <line x1="1520" y1="25" x2="1520" y2="280" stroke="#2d313a" stroke-dasharray="2,3" />
+                  <text x="100" y="20" text-anchor="middle" fill="#f1f5f9" font-weight="700">NEW DELHI (KM 0.0)</text>
+                  <text x="320" y="20" text-anchor="middle" fill="#94a3b8">CSB (KM 2.3)</text>
+                  <text x="560" y="20" text-anchor="middle" fill="#94a3b8">TILAK BRIDGE (KM 4.1)</text>
+                  <text x="900" y="20" text-anchor="middle" fill="#f1f5f9" font-weight="700">ANAND VIHAR (KM 13.8)</text>
+                  <text x="1250" y="20" text-anchor="middle" fill="#94a3b8">SAHIBABAD (KM 22.4)</text>
+                  <text x="1520" y="20" text-anchor="middle" fill="#f1f5f9" font-weight="700">GHAZIABAD (KM 28.6)</text>
+                </g>
+              </g>
+
+              <!-- Track 1: UP FAST (Y = 65) -->
+              <g id="ei-up-fast">
+                <text x="10" y="70" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#f59e0b">UP FAST &#x25C0;</text>
+                <line x1="80" y1="65" x2="1550" y2="65" stroke="#2d313a" stroke-width="4.5" stroke-linecap="round" />
+                
+                <!-- TC-01 -->
+                <line x1="90" y1="65" x2="300" y2="65" stroke="#10b981" stroke-width="3.5" cursor="pointer" onclick="selectBlock('TC-01')"/>
+                <text x="195" y="55" font-family="JetBrains Mono" font-size="8.5" fill="#10b981" text-anchor="middle">TC-01 [CLEAR]</text>
+                <circle cx="95" cy="46" r="3.5" fill="#10b981" filter="url(#ei-glow-green)" />
+
+                <!-- TC-02 -->
+                <line x1="310" y1="65" x2="540" y2="65" stroke="#475569" stroke-width="3" cursor="pointer" onclick="selectBlock('TC-02')"/>
+                <text x="425" y="55" font-family="JetBrains Mono" font-size="8.5" fill="#64748b" text-anchor="middle">TC-02</text>
+                <circle cx="315" cy="46" r="3.5" fill="#f59e0b" filter="url(#ei-glow-amber)" />
+
+                <!-- TC-03: Occupied by 12951 Rajdhani -->
+                <line x1="550" y1="65" x2="880" y2="65" stroke="#10b981" stroke-width="4.5" cursor="pointer" onclick="selectTrain('12951')"/>
+                <text x="635" y="55" font-family="JetBrains Mono" font-size="8.5" fill="#10b981" font-weight="700" text-anchor="middle">TC-03 [OCCUPIED]</text>
+                <circle cx="555" cy="46" r="3.5" fill="#10b981" filter="url(#ei-glow-green)" />
+                
+
+                <!-- TC-04 -->
+                <line x1="890" y1="65" x2="1230" y2="65" stroke="#475569" stroke-width="3" cursor="pointer" onclick="selectBlock('TC-04')"/>
+                <text x="1060" y="55" font-family="JetBrains Mono" font-size="8.5" fill="#64748b" text-anchor="middle">TC-04</text>
+                <circle cx="895" cy="46" r="3.5" fill="#10b981" filter="url(#ei-glow-green)" />
+
+                <!-- TC-05: Route Locked -->
+                <line x1="1240" y1="65" x2="1450" y2="65" stroke="#f59e0b" stroke-width="3.5" stroke-dasharray="5,2" cursor="pointer" onclick="selectBlock('TC-05')"/>
+                <text x="1345" y="55" font-family="JetBrains Mono" font-size="8.5" fill="#f59e0b" text-anchor="middle">TC-05 [LOCKED]</text>
+                <circle cx="1245" cy="46" r="3.5" fill="#f59e0b" filter="url(#ei-glow-amber)" />
+
+                <!-- TC-06 -->
+                <line x1="1460" y1="65" x2="1550" y2="65" stroke="#475569" stroke-width="3" cursor="pointer" onclick="selectBlock('TC-06')"/>
+                <text x="1505" y="55" font-family="JetBrains Mono" font-size="8.5" fill="#64748b" text-anchor="middle">TC-06</text>
+                <circle cx="1465" cy="46" r="3.5" fill="#10b981" filter="url(#ei-glow-green)" />
+              </g>
+
+              <!-- Track 2: UP SLOW / SUBURBAN (Y = 115) -->
+              <g id="ei-up-slow">
+                <text x="10" y="120" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#94a3b8">UP SLOW &#x25C0;</text>
+                <line x1="80" y1="115" x2="1550" y2="115" stroke="#2d313a" stroke-width="3.5" stroke-linecap="round" />
+                <line x1="90" y1="115" x2="550" y2="115" stroke="#475569" stroke-width="2.5" />
+                <line x1="560" y1="115" x2="1150" y2="115" stroke="#10b981" stroke-width="2.5" />
+                <text x="970" y="107" font-family="JetBrains Mono" font-size="8" fill="#10b981" text-anchor="middle">SUBURBAN LOCAL CORRIDOR [CLEAR]</text>
+                <line x1="1160" y1="115" x2="1550" y2="115" stroke="#475569" stroke-width="2.5" />
+              </g>
+
+              <!-- Track 3: DN FAST (Y = 195) -->
+              <g id="ei-dn-fast">
+                <text x="10" y="200" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#f59e0b">DN FAST &#x25B6;</text>
+                <line x1="80" y1="195" x2="1550" y2="195" stroke="#2d313a" stroke-width="4.5" stroke-linecap="round" />
+
+                <!-- TC-07: AI Dispatch (12436 Shatabdi) -->
+                <line x1="90" y1="195" x2="310" y2="195" stroke="#ea580c" stroke-width="3.5" stroke-dasharray="5,2" cursor="pointer" onclick="selectTrain('12436')"/>
+                <text x="200" y="217" font-family="JetBrains Mono" font-size="8.5" fill="#ea580c" text-anchor="middle">TC-07 [REG]</text>
+                <circle cx="95" cy="209" r="3.5" fill="#ea580c" />
+                
+
+                <!-- TC-08: Emergency Brake (22222 Vande Bharat) -->
+                <line x1="320" y1="195" x2="570" y2="195" stroke="#ef4444" stroke-width="4.5" cursor="pointer" onclick="selectTrain('22222')"/>
+                <text x="445" y="217" font-family="JetBrains Mono" font-size="8.5" fill="#ef4444" font-weight="700" text-anchor="middle">TC-08 [EMG BRAKE]</text>
+                <circle cx="325" cy="209" r="3.5" fill="#ef4444" filter="url(#ei-glow-red)" />
+                
+
+                <!-- TC-09: Phantom Drop Desync -->
+                <line x1="580" y1="195" x2="890" y2="195" stroke="#f59e0b" stroke-width="3" stroke-dasharray="3,3" cursor="pointer" onclick="selectBlock('TC-09')"/>
+                <text x="735" y="217" font-family="JetBrains Mono" font-size="8.5" fill="#f59e0b" text-anchor="middle">TC-09 [DESYNC DP-15]</text>
+                <circle cx="585" cy="209" r="3.5" fill="#f59e0b" filter="url(#ei-glow-amber)" />
+
+                <!-- TC-10 -->
+                <line x1="900" y1="195" x2="1140" y2="195" stroke="#475569" stroke-width="3" cursor="pointer" onclick="selectBlock('TC-10')"/>
+                <text x="1020" y="217" font-family="JetBrains Mono" font-size="8.5" fill="#64748b" text-anchor="middle">TC-10</text>
+                <circle cx="905" cy="209" r="3.5" fill="#10b981" filter="url(#ei-glow-green)" />
+
+                <!-- TC-11: 12302 Howrah Rajdhani Delayed -->
+                <line x1="1150" y1="195" x2="1390" y2="195" stroke="#ef4444" stroke-width="4.5" cursor="pointer" onclick="selectTrain('12302')"/>
+                <text x="1270" y="217" font-family="JetBrains Mono" font-size="8.5" fill="#f59e0b" text-anchor="middle">TC-11 [+14m DELAY]</text>
+                <circle cx="1155" cy="209" r="3.5" fill="#ef4444" filter="url(#ei-glow-red)" />
+                
+
+                <!-- TC-12 -->
+                <line x1="1400" y1="195" x2="1550" y2="195" stroke="#475569" stroke-width="3" cursor="pointer" onclick="selectBlock('TC-12')"/>
+                <text x="1475" y="217" font-family="JetBrains Mono" font-size="8.5" fill="#64748b" text-anchor="middle">TC-12</text>
+                <circle cx="1405" cy="209" r="3.5" fill="#10b981" filter="url(#ei-glow-green)" />
+              </g>
+
+              <!-- Track 4: DN SLOW / DFCC FREIGHT BYPASS (Y = 245) -->
+              <g id="ei-dn-slow">
+                <text x="10" y="250" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#94a3b8">DFCC BYPASS &#x25B6;</text>
+                <line x1="80" y1="245" x2="1550" y2="245" stroke="#2d313a" stroke-width="3.5" stroke-linecap="round" />
+                <line x1="90" y1="245" x2="700" y2="245" stroke="#475569" stroke-width="2.5" stroke-dasharray="4,2"/>
+                <line x1="710" y1="245" x2="1200" y2="245" stroke="#10b981" stroke-width="2.5" />
+                <text x="955" y="238" font-family="JetBrains Mono" font-size="8" fill="#10b981" text-anchor="middle">DFCC HEAVY FREIGHT BYPASS [CLEAR]</text>
+                <line x1="1210" y1="245" x2="1550" y2="245" stroke="#475569" stroke-width="2.5" stroke-dasharray="4,2"/>
+              </g>
+
+              <!-- Electronic Switch Crossovers & Point Machine Badges -->
+              <!-- SW-01 Crossover (NDLS Exit) -->
+              <g id="ei-sw-01" cursor="pointer" onclick="togglePoint('PM-01')">
+                <line x1="210" y1="65" x2="250" y2="115" stroke="#f59e0b" stroke-width="2" stroke-dasharray="3,3" />
+                <rect x="215" y="80" width="40" height="15" rx="2" fill="#1c1e23" stroke="#f59e0b" stroke-width="1"/>
+                <text x="235" y="91" font-family="JetBrains Mono" font-size="7.5" fill="#f59e0b" text-anchor="middle">SW-01(N)</text>
+              </g>
+
+              <!-- SW-02 Crossover (Yamuna Approach) -->
+              <g id="ei-sw-02" cursor="pointer" onclick="togglePoint('PM-02')">
+                <line x1="480" y1="115" x2="520" y2="195" stroke="#f59e0b" stroke-width="2" stroke-dasharray="3,3" />
+                <rect x="485" y="145" width="40" height="15" rx="2" fill="#1c1e23" stroke="#f59e0b" stroke-width="1"/>
+                <text x="505" y="156" font-family="JetBrains Mono" font-size="7.5" fill="#f59e0b" text-anchor="middle">SW-02(N)</text>
+              </g>
+
+              <!-- SW-04 Diamond Crossover (Anand Vihar Junction) -->
+              <g id="ei-sw-04" cursor="pointer" onclick="togglePoint('PM-04')">
+                <line x1="840" y1="65" x2="880" y2="195" stroke="#f59e0b" stroke-width="2.5" />
+                <rect x="845" y="120" width="42" height="15" rx="2" fill="#1e1014" stroke="#f59e0b" stroke-width="1.5"/>
+                <text x="866" y="131" font-family="JetBrains Mono" font-size="7.5" fill="#f59e0b" font-weight="700" text-anchor="middle">SW-04(R)</text>
+              </g>
+
+              <!-- SW-09 Siding Divert (Sahibabad) -->
+              <g id="ei-sw-09" cursor="pointer" onclick="togglePoint('PM-09')">
+                <line x1="1180" y1="195" x2="1220" y2="245" stroke="#f59e0b" stroke-width="2" stroke-dasharray="3,3" />
+                <rect x="1185" y="210" width="40" height="15" rx="2" fill="#1c1e23" stroke="#f59e0b" stroke-width="1"/>
+                <text x="1205" y="221" font-family="JetBrains Mono" font-size="7.5" fill="#f59e0b" text-anchor="middle">SW-09(N)</text>
+              </g>
+
+              <!-- SW-15 GZB Entry Ladder -->
+              <g id="ei-sw-15" cursor="pointer" onclick="togglePoint('PM-15')">
+                <line x1="1480" y1="65" x2="1515" y2="115" stroke="#f59e0b" stroke-width="2" stroke-dasharray="3,3" />
+                <rect x="1485" y="80" width="40" height="15" rx="2" fill="#1c1e23" stroke="#f59e0b" stroke-width="1"/>
+                <text x="1505" y="91" font-family="JetBrains Mono" font-size="7.5" fill="#f59e0b" text-anchor="middle">SW-15(N)</text>
+              </g>
+
+              <g id="ei-dynamic-trains-layer"></g>
+              <!-- Interlocking Signal Aspects SIG-01 to SIG-12 -->
+              <g id="ei-signals" font-family="JetBrains Mono" font-size="7" font-weight="700">
+                <!-- S-01 -->
+                <circle cx="105" cy="40" r="4.5" fill="#10b981" filter="url(#ei-glow-green)"/>
+                <text x="105" y="32" fill="#10b981" text-anchor="middle">SIG-01</text>
+
+                <!-- S-03 -->
+                <circle cx="348" cy="40" r="4.5" fill="#f59e0b" filter="url(#ei-glow-amber)"/>
+                <circle cx="348" cy="30" r="3.5" fill="#f59e0b" />
+                <text x="348" y="23" fill="#f59e0b" text-anchor="middle">SIG-03</text>
+
+                <!-- S-05 -->
+                <circle cx="565" cy="40" r="4.5" fill="#10b981" filter="url(#ei-glow-green)"/>
+                <text x="565" y="32" fill="#10b981" text-anchor="middle">SIG-05</text>
+
+                <!-- S-07 -->
+                <circle cx="905" cy="40" r="4.5" fill="#10b981" filter="url(#ei-glow-green)"/>
+                <text x="905" y="32" fill="#10b981" text-anchor="middle">SIG-07</text>
+
+                <!-- S-08 (Emergency Red at TC-08) -->
+                <circle cx="325" cy="216" r="4.5" fill="#ef4444" filter="url(#ei-glow-red)"/>
+                <text x="325" y="230" fill="#ef4444" text-anchor="middle">SIG-08 (RED)</text>
+
+                <!-- S-09 (Flashing Yellow at TC-09) -->
+                <circle cx="585" cy="216" r="4.5" fill="#f59e0b" filter="url(#ei-glow-amber)"/>
+                <text x="585" y="230" fill="#f59e0b" text-anchor="middle">SIG-09 (YY)</text>
+
+                <!-- S-11 (Red at TC-11) -->
+                <circle cx="1155" cy="216" r="4.5" fill="#ef4444" filter="url(#ei-glow-red)"/>
+                <text x="1155" y="230" fill="#ef4444" text-anchor="middle">SIG-11 (RED)</text>
+              </g>
+
+              <!-- Footer Sector Labels -->
+              <g id="ei-footer-sector-labels" font-family="JetBrains Mono" font-size="8.5" fill="#475569">
+                <text x="100" y="290">NDLS YARD &amp; INTERCHANGE (KM 0.0)</text>
+                <text x="420" y="290">YAMUNA RIVER RAIL BRIDGE (KM 3.6)</text>
+                <text x="900" y="290">ANAND VIHAR INTERCHANGE (KM 13.8)</text>
+                <text x="1250" y="290">SAHIBABAD JN (KM 22.4)</text>
+                <text x="1520" y="290" text-anchor="end">GZB &amp; DFCC MERGE (KM 28.6)</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <!-- 3-Column Diagnostic & Control Deck -->
+        <div class="interlocking-tri-grid">
+          
+          <!-- Column 1: Electronic Point Machines (Switch Control) -->
+          <div class="interlocking-subcard">
+            <div class="module-header">
+              <div class="module-title-group">
+                <span class="material-symbols-outlined header-icon text-cyan" aria-hidden="true">tune</span>
+                <h4 class="module-title">POINT MACHINES (IRS 24V)</h4>
+              </div>
+              <span class="kpi-micro-tag tag-cyan">6 MACHINES</span>
+            </div>
+
+            <div style="overflow-x: auto; flex: 1;">
+              <table class="point-machine-table" aria-label="Electronic Point Machines Status">
+                <thead>
+                  <tr>
+                    <th>POINT</th>
+                    <th>LOCATION</th>
+                    <th>POSITION</th>
+                    <th>STROKE</th>
+                    <th>CURRENT</th>
+                    <th>ACTION</th>
+                  </tr>
+                </thead>
+                <tbody id="point-machine-table-body">
+                  <!-- Row 1: PM-01 -->
+                  <tr id="pm-row-01">
+                    <td class="font-mono font-bold text-cyan">PM-01</td>
+                    <td class="text-dim">NDLS Exit Cross</td>
+                    <td><span class="status-pill status-nominal" id="pm-pos-01">NORMAL (N)</span></td>
+                    <td class="font-mono text-nominal">2.3s</td>
+                    <td class="font-mono">3.2A</td>
+                    <td><button class="btn-point-throw" onclick="togglePoint('PM-01')">THROW [R]</button></td>
+                  </tr>
+                  <!-- Row 2: PM-02 -->
+                  <tr id="pm-row-02">
+                    <td class="font-mono font-bold text-cyan">PM-02</td>
+                    <td class="text-dim">Yamuna Approach</td>
+                    <td><span class="status-pill status-nominal" id="pm-pos-02">NORMAL (N)</span></td>
+                    <td class="font-mono text-nominal">2.1s</td>
+                    <td class="font-mono">3.1A</td>
+                    <td><button class="btn-point-throw" onclick="togglePoint('PM-02')">THROW [R]</button></td>
+                  </tr>
+                  <!-- Row 3: PM-04 (Caution) -->
+                  <tr id="pm-row-04" style="background: var(--color-caution-subtle);">
+                    <td class="font-mono font-bold text-caution">PM-04</td>
+                    <td class="text-dim">ANVT Diamond</td>
+                    <td><span class="status-pill" style="background: var(--color-caution); color: #000;" id="pm-pos-04">REVERSE (R)</span></td>
+                    <td class="font-mono text-caution font-bold">4.2s (SLOW)</td>
+                    <td class="font-mono text-caution">4.8A</td>
+                    <td><button class="btn-point-throw" onclick="togglePoint('PM-04')">THROW [N]</button></td>
+                  </tr>
+                  <!-- Row 4: PM-09 -->
+                  <tr id="pm-row-09">
+                    <td class="font-mono font-bold text-cyan">PM-09</td>
+                    <td class="text-dim">SBB South Loop</td>
+                    <td><span class="status-pill status-nominal" id="pm-pos-09">NORMAL (N)</span></td>
+                    <td class="font-mono text-nominal">2.4s</td>
+                    <td class="font-mono">3.3A</td>
+                    <td><button class="btn-point-throw" onclick="togglePoint('PM-09')">THROW [R]</button></td>
+                  </tr>
+                  <!-- Row 5: PM-12 -->
+                  <tr id="pm-row-12">
+                    <td class="font-mono font-bold text-cyan">PM-12</td>
+                    <td class="text-dim">GZB West Flyover</td>
+                    <td><span class="status-pill status-nominal" id="pm-pos-12">NORMAL (N)</span></td>
+                    <td class="font-mono text-nominal">2.2s</td>
+                    <td class="font-mono">3.0A</td>
+                    <td><button class="btn-point-throw" onclick="togglePoint('PM-12')">THROW [R]</button></td>
+                  </tr>
+                  <!-- Row 6: PM-15 -->
+                  <tr id="pm-row-15">
+                    <td class="font-mono font-bold text-cyan">PM-15</td>
+                    <td class="text-dim">GZB Platform Ladder</td>
+                    <td><span class="status-pill status-nominal" id="pm-pos-15">NORMAL (N)</span></td>
+                    <td class="font-mono text-nominal">2.5s</td>
+                    <td class="font-mono">3.4A</td>
+                    <td><button class="btn-point-throw" onclick="togglePoint('PM-15')">THROW [R]</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Column 2: Electronic Signal Aspect Health Matrix -->
+          <div class="interlocking-subcard">
+            <div class="module-header">
+              <div class="module-title-group">
+                <span class="material-symbols-outlined header-icon text-nominal" aria-hidden="true">traffic</span>
+                <h4 class="module-title">SIGNAL ASPECT HEALTH &amp; KAVACH</h4>
+              </div>
+              <span class="kpi-micro-tag tag-nominal">SIL-4 PROVED</span>
+            </div>
+
+            <div class="signal-matrix-list" id="signal-matrix-container">
+              <!-- Sig 01 -->
+              <div class="signal-row-item">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-mono font-bold text-ink">SIG-01 (NDLS ADV STARTER)</span>
+                    <span class="kpi-micro-tag tag-cyan">KM 1.2</span>
+                  </div>
+                  <span class="text-dim text-xs">Primary Filament: 100% · Kavach MA: 3,200m</span>
+                </div>
+                <div class="signal-aspect-badge text-nominal">
+                  <span class="signal-lamp-dot bg-nominal"></span>
+                  <span>GREEN (PROCEED)</span>
+                </div>
+              </div>
+
+              <!-- Sig 03 -->
+              <div class="signal-row-item">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-mono font-bold text-ink">SIG-03 (TKJ HOME)</span>
+                    <span class="kpi-micro-tag tag-cyan">KM 4.1</span>
+                  </div>
+                  <span class="text-dim text-xs">Primary Filament: 98% · Kavach MA: 1,600m</span>
+                </div>
+                <div class="signal-aspect-badge text-caution">
+                  <span class="signal-lamp-dot bg-caution"></span>
+                  <span>DOUBLE YELLOW (ATTN)</span>
+                </div>
+              </div>
+
+              <!-- Sig 08 (Emergency Red) -->
+              <div class="signal-row-item" style="border-left: 3px solid var(--color-danger);">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-mono font-bold text-danger">SIG-08 (SBB STARTER)</span>
+                    <span class="kpi-micro-tag tag-danger">TRIP ACTIVE</span>
+                  </div>
+                  <span class="text-dim text-xs">Fail-Safe Emergency Red · TC-08 22222 Rake</span>
+                </div>
+                <div class="signal-aspect-badge text-danger">
+                  <span class="signal-lamp-dot bg-danger"></span>
+                  <span>RED (DANGER)</span>
+                </div>
+              </div>
+
+              <!-- Sig 09 (Caution Aspect) -->
+              <div class="signal-row-item">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-mono font-bold text-ink">SIG-09 (ANVT RECEPTION)</span>
+                    <span class="kpi-micro-tag tag-caution">DESYNC HOLD</span>
+                  </div>
+                  <span class="text-dim text-xs">Awaiting Axle Counter DP-15 Reset</span>
+                </div>
+                <div class="signal-aspect-badge text-caution">
+                  <span class="signal-lamp-dot bg-caution"></span>
+                  <span>YELLOW (CAUTION)</span>
+                </div>
+              </div>
+
+              <!-- Sig 11 (Hold Hold Aspect) -->
+              <div class="signal-row-item" style="border-left: 3px solid var(--color-danger);">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-mono font-bold text-danger">SIG-11 (GZB HOME DN)</span>
+                    <span class="kpi-micro-tag tag-danger">HOLDING #12302</span>
+                  </div>
+                  <span class="text-dim text-xs">Priority Slotting Hold for 12951 Up Fast</span>
+                </div>
+                <div class="signal-aspect-badge text-danger">
+                  <span class="signal-lamp-dot bg-danger"></span>
+                  <span>RED (DANGER)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 3: Axle Counter & Track Circuit Diagnostics -->
+          <div class="interlocking-subcard">
+            <div class="module-header">
+              <div class="module-title-group">
+                <span class="material-symbols-outlined header-icon text-caution" aria-hidden="true">sensors</span>
+                <h4 class="module-title">AXLE COUNTER DP LOGS</h4>
+              </div>
+              <span class="kpi-micro-tag tag-caution">1 DESYNC</span>
+            </div>
+
+            <div class="axle-diag-list" id="axle-diag-container">
+              <!-- DP-01 -->
+              <div class="axle-diag-row">
+                <div>
+                  <span class="font-bold text-ink">DP-01 / DP-02 (TC-01)</span>
+                  <span class="text-dim block text-xs">IN: 88 · OUT: 88</span>
+                </div>
+                <span class="text-nominal font-bold">&Delta; = 0 [OK]</span>
+              </div>
+
+              <!-- DP-03 -->
+              <div class="axle-diag-row">
+                <div>
+                  <span class="font-bold text-ink">DP-03 / DP-04 (TC-03)</span>
+                  <span class="text-dim block text-xs">IN: 92 · OUT: 0 (#12951 In Block)</span>
+                </div>
+                <span class="text-nominal font-bold">OCCUPIED [VALID]</span>
+              </div>
+
+              <!-- DP-15: DESYNC FAULT -->
+              <div class="axle-diag-row" style="background: var(--color-danger-subtle); border-color: var(--color-danger-border);">
+                <div>
+                  <span class="font-bold text-danger">DP-15 / DP-16 (TC-09)</span>
+                  <span class="text-danger block text-xs">IN: 148 · OUT: 147 (Pulse Drop)</span>
+                </div>
+                <button class="btn-point-throw" id="btn-reset-dp15" style="border-color: var(--color-danger); color: var(--color-danger);" onclick="resetAxleCounter('TC-09')">
+                  RESET SIL-4
+                </button>
+              </div>
+
+              <!-- DP-07 -->
+              <div class="axle-diag-row">
+                <div>
+                  <span class="font-bold text-ink">DP-07 / DP-08 (TC-07)</span>
+                  <span class="text-dim block text-xs">IN: 64 · OUT: 64 (#12436 Passed)</span>
+                </div>
+                <span class="text-nominal font-bold">&Delta; = 0 [OK]</span>
+              </div>
+
+              <!-- DP-11 -->
+              <div class="axle-diag-row">
+                <div>
+                  <span class="font-bold text-ink">DP-11 / DP-12 (TC-10)</span>
+                  <span class="text-dim block text-xs">IN: 0 · OUT: 0</span>
+                </div>
+                <span class="text-nominal font-bold">&Delta; = 0 [CLEAR]</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- =================================================================
+           VIEW 2: TACTICAL GIS RAILWAY MAP
+           ================================================================= -->
+      <section class="content-view" id="view-gis" aria-labelledby="gis-heading">
+        <h2 id="gis-heading" class="sr-only">Live Tactical GIS Railway Network Map</h2>
+        
+        <div class="gis-map-viewport-wrapper">
+          <!-- Leaflet Tactical Basemap Div -->
+          <div class="gis-tactical-map" id="gis-tactical-map" tabindex="0" role="region" aria-label="Interactive GIS Railway Map"></div>
+
+          <!-- Floating Top HUD Controls -->
+          <div class="gis-floating-top-hud">
+            <div class="gis-hud-sector-pill">
+              <span class="material-symbols-outlined text-secondary" style="font-size: 16px;" aria-hidden="true">radar</span>
+              <span class="font-mono text-cyan font-bold">WESTERN TRUNK CORRIDOR</span>
+              <span class="gis-sep" aria-hidden="true">•</span>
+              <span class="text-dim font-mono">MMCT ➔ NDLS (1,386 KM)</span>
+              <span class="gis-hud-chip status-nominal">SIL-4 KAVACH ACTIVE</span>
+            </div>
+
+            <!-- Layer & Zoom Controls -->
+            <div class="gis-hud-actions">
+              <button class="gis-action-btn active" id="gis-btn-all" title="Show All Lines">ALL TRACKS</button>
+              <button class="gis-action-btn" id="gis-btn-brc" title="Focus on Vadodara Junction">JUMP: BRC (KM 392)</button>
+              <button class="gis-action-btn" id="gis-btn-rtm" title="Focus on Ratlam Ghat Section">JUMP: RTM (KM 653)</button>
+              <button class="gis-action-btn" id="gis-btn-ndls" title="Focus on New Delhi Terminal">JUMP: NDLS (KM 1386)</button>
+              <button class="gis-action-btn" id="gis-btn-reset" title="Full Corridor View">
+                <span class="material-symbols-outlined" style="font-size: 14px;" aria-hidden="true">fit_screen</span>
+                <span>FULL CORRIDOR</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Floating Right Waypoint Speed Profile & Legend -->
+          <div class="gis-floating-right-card" id="gis-speed-profile-card">
+            <div class="gis-card-header">
+              <div class="flex items-center gap-1">
+                <span class="material-symbols-outlined text-secondary" style="font-size: 15px;" aria-hidden="true">show_chart</span>
+                <span class="gis-card-title" id="gis-speed-card-title">CORRIDOR SPEED PROFILE</span>
+              </div>
+              <span class="gis-badge-pill pill-cyan" id="gis-psr-badge">PSR 130 MAX</span>
+            </div>
+
+            <!-- Mini Train Selector Strip inside GIS Speed Profile Card -->
+            <div class="gis-train-strip" id="gis-train-strip" style="display: flex; gap: 4px; overflow-x: auto; margin-bottom: 6px; padding-bottom: 2px;"></div>
+            
+            <!-- Mini SVG Speed Profile -->
+            <div class="gis-speed-svg-wrap" id="gis-speed-svg-wrap">
+              <svg viewBox="0 0 280 85" preserveAspectRatio="none" class="gis-speed-svg" id="gis-speed-svg-el" aria-label="Waypoint speed curve">
+                <defs>
+                  <linearGradient id="speedGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.4"/>
+                    <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.0"/>
+                  </linearGradient>
+                </defs>
+                <!-- Grid Lines -->
+                <line x1="10" y1="15" x2="270" y2="15" stroke="#2d313a" stroke-dasharray="2,2"/>
+                <line x1="10" y1="45" x2="270" y2="45" stroke="#2d313a" stroke-dasharray="2,2"/>
+                <line x1="10" y1="75" x2="270" y2="75" stroke="#334155" stroke-width="1.5"/>
+                
+                <path id="gis-speed-area-path" d="M 10 75 L 10 40 L 40 32 L 80 20 L 120 22 L 150 48 L 180 22 L 230 18 L 270 20 L 270 75 Z" fill="url(#speedGrad)"/>
+                <path id="gis-speed-line-path" d="M 10 40 L 40 32 L 80 20 L 120 22 L 150 48 L 180 22 L 230 18 L 270 20" fill="none" stroke="#f59e0b" stroke-width="2"/>
+                
+                <!-- Dynamic Current Train Pin -->
+                <g id="gis-speed-pin-group">
+                  <circle cx="120" cy="22" r="7" fill="none" stroke="#10b981" stroke-width="1" opacity="0.6"/>
+                  <circle cx="120" cy="22" r="4" fill="#10b981" stroke="#ffffff" stroke-width="1.5"/>
+                  <text x="120" y="14" fill="#10b981" font-family="JetBrains Mono" font-size="8" font-weight="700" text-anchor="middle">#12952 (112k)</text>
+                </g>
+                
+                <!-- Station axis labels -->
+                <g id="gis-speed-stations-group">
+                  <text x="10" y="83" fill="#64748b" font-family="JetBrains Mono" font-size="7">MMCT</text>
+                  <text x="75" y="83" fill="#64748b" font-family="JetBrains Mono" font-size="7">ST</text>
+                  <text x="120" y="83" fill="#f59e0b" font-family="JetBrains Mono" font-size="7" font-weight="700">BRC</text>
+                  <text x="175" y="83" fill="#64748b" font-family="JetBrains Mono" font-size="7">RTM</text>
+                  <text x="225" y="83" fill="#64748b" font-family="JetBrains Mono" font-size="7">KOTA</text>
+                  <text x="265" y="83" fill="#64748b" font-family="JetBrains Mono" font-size="7">NDLS</text>
+                </g>
+              </svg>
+            </div>
+
+            <!-- Signal & Layer Legend -->
+            <div class="gis-legend-strip">
+              <span class="gis-legend-item"><span class="gis-dot bg-nominal"></span> Green (Clear)</span>
+              <span class="gis-legend-item"><span class="gis-dot bg-caution"></span> Yellow (Caution)</span>
+              <span class="gis-legend-item"><span class="gis-dot bg-danger"></span> Red (Danger)</span>
+              <span class="gis-legend-item"><span class="gis-dot bg-ai"></span> Speed Regulated</span>
+            </div>
+          </div>
+
+          <!-- Floating Bottom Live Telemetry HUD Strip -->
+          <div class="gis-floating-bottom-hud">
+            <div class="gis-telemetry-focus">
+              <div class="gis-focus-badge" id="gis-bottom-focus-badge">
+                <span class="pulse-indicator-emerald" aria-hidden="true"></span>
+                <span class="font-mono text-nominal font-bold">#12952 MMCT–NDLS TEJAS RAJDHANI</span>
+              </div>
+              <div class="gis-metrics-row" id="gis-bottom-metrics-row">
+                <span class="gis-metric">SPEED: <strong class="font-mono text-nominal">112 KM/H</strong></span>
+                <span class="gis-sep" aria-hidden="true">•</span>
+                <span class="gis-metric">BLOCK: <strong class="font-mono text-cyan">TC-BRC-02</strong></span>
+                <span class="gis-sep" aria-hidden="true">•</span>
+                <span class="gis-metric">APPROACH: <strong class="font-mono text-slate-100">VADODARA JN (18 KM)</strong></span>
+                <span class="gis-sep" aria-hidden="true">•</span>
+                <span class="gis-metric">ETA CONF: <strong class="font-mono text-cyan">99.8%</strong></span>
+              </div>
+            </div>
+
+            <div class="gis-hud-right-actions" id="gis-hud-right-actions">
+              <button class="btn-tactical-csv" id="gis-bottom-inspect-btn" onclick="selectTrain('12952')" title="Inspect Train Diagnostics">
+                <span class="material-symbols-outlined" style="font-size: 15px;" aria-hidden="true">open_in_new</span>
+                <span>INSPECT RAKE (#12952)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================
+           VIEW 3: AI DELAY INTELLIGENCE CONSOLE (Stitch Screen cf567c755c104bd9865dd0e98c75dd9a)
+           ================================================================= -->
+      <section class="content-view" id="view-delay-intel" aria-labelledby="delay-heading">
+        <h2 id="delay-heading" class="sr-only">Dynamic Delay Intelligence Console</h2>
+
+        <div class="delay-intel-workspace">
+          <!-- Dynamic Target Train Selector Strip for AI Delay Analytics -->
+          <div class="delay-train-selector-bar" style="width: 100%; grid-column: 1 / -1; background:var(--color-surface-subtle); border:1px solid var(--color-rule); border-radius:6px; padding:10px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="material-symbols-outlined text-cyan" style="font-size:22px;">psychology</span>
+              <div>
+                <span class="text-xs font-mono text-dim" style="text-transform:uppercase; letter-spacing:0.05em;">ACTIVE TELEMETRY TARGET:</span>
+                <h4 id="delay-target-train-heading" style="margin:0; font-size:13px; font-weight:700; color:var(--color-ink);">#12952 MMCT TEJAS RAJDHANI (SELECT TRAIN BELOW)</h4>
+              </div>
+            </div>
+            <div class="track-filter-group" id="delay-train-pills" role="group" aria-label="Select target train for delay analysis">
+              <button class="track-pill-btn active" data-delay-train="12952">12952 (MMCT RAJ)</button>
+              <button class="track-pill-btn" data-delay-train="12951">12951 (NDLS RAJ)</button>
+              <button class="track-pill-btn" data-delay-train="20901">20901 (VANDE BHARAT)</button>
+              <button class="track-pill-btn" data-delay-train="12904">12904 (GOLDEN TEMPLE)</button>
+              <button class="track-pill-btn" data-delay-train="22222">22222 (CSMT RAJ)</button>
+              <button class="track-pill-btn" data-delay-train="12302">12302 (HWH RAJ)</button>
+              <button class="track-pill-btn" data-delay-train="12436">12436 (GARIB RATH)</button>
+              <button class="track-pill-btn" data-delay-train="12004">12004 (SHATABDI)</button>
+            </div>
+          </div>
+          
+          <!-- LEFT COLUMN: 65% Width (Conformal Prediction + Section Waterfall Progression) -->
+          <div class="delay-col-left">
+            
+            <!-- Card 1: Conformal Delay Estimation Interval -->
+            <div class="module-card">
+              <div class="module-header">
+                <div class="module-title-group">
+                  <span class="material-symbols-outlined header-icon text-cyan" aria-hidden="true">query_stats</span>
+                  <div>
+                    <h3 class="module-title">CONFORMAL DELAY ESTIMATION INTERVAL</h3>
+                    <p class="module-subtitle">90% Confidence Window · ST-GCN + LightGBM Hybrid Spatio-Temporal Model</p>
+                  </div>
+                </div>
+                <div class="target-train-badge">
+                  <span class="pulse-indicator-emerald" aria-hidden="true"></span>
+                  <span class="text-dim">TARGET TRAIN:</span>
+                  <span class="font-mono text-cyan font-bold">#12952 (MMCT-NDLS TEJAS RAJDHANI)</span>
+                  <span class="kpi-micro-tag tag-nominal">APPROACHING BRC</span>
+                </div>
+              </div>
+
+              <!-- Conformal Graph Container -->
+              <div class="conformal-chart-wrap">
+                <div class="conformal-chart-legend">
+                  <div class="flex items-center gap-3">
+                    <span class="chart-legend-key"><i class="dash-line" aria-hidden="true"></i> CRIS Timetable Schedule: <strong class="text-ink">15:40 IST</strong></span>
+                    <span class="chart-legend-key"><i class="band-box" aria-hidden="true"></i> Conformal Prediction Band (&alpha; = 0.10)</span>
+                  </div>
+                  <div class="text-cyan font-mono font-semibold">Arrival Target: Platform Road 02 (BRC)</div>
+                </div>
+
+                <!-- SVG Timeline & Probability Density Display -->
+                <div class="conformal-svg-container">
+                  <svg viewBox="0 0 800 130" preserveAspectRatio="none" class="conformal-svg" id="conformal-svg-chart" aria-label="Conformal probability curve">
+                    <defs>
+                      <linearGradient id="conformalGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.45"/>
+                        <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.03"/>
+                      </linearGradient>
+                      <linearGradient id="curveGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
+                        <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+                      </linearGradient>
+                    </defs>
+
+                    <!-- Time Guideline Grid -->
+                    <line x1="80" y1="10" x2="80" y2="100" stroke="#2d313a" stroke-dasharray="2,2"/>
+                    <line x1="200" y1="10" x2="200" y2="100" stroke="#2d313a" stroke-dasharray="2,2"/>
+                    <line x1="320" y1="10" x2="320" y2="100" stroke="#2d313a" stroke-dasharray="2,2"/>
+                    <line x1="440" y1="10" x2="440" y2="100" stroke="#2d313a" stroke-dasharray="2,2"/>
+                    <line x1="560" y1="10" x2="560" y2="100" stroke="#2d313a" stroke-dasharray="2,2"/>
+                    <line x1="680" y1="10" x2="680" y2="100" stroke="#2d313a" stroke-dasharray="2,2"/>
+                    
+                    <!-- Base Axis -->
+                    <line x1="20" y1="100" x2="780" y2="100" stroke="#334155" stroke-width="2"/>
+
+                    <!-- CRIS Timetable Scheduled Baseline (15:40) at X=160 -->
+                    <line x1="160" y1="18" x2="160" y2="100" stroke="#94a3b8" stroke-dasharray="4,3" stroke-width="2"/>
+                    <circle cx="160" cy="100" r="4" fill="#94a3b8"/>
+                    <text x="160" y="14" fill="#94a3b8" font-family="JetBrains Mono" font-size="9" font-weight="700" text-anchor="middle">SCHEDULE 15:40 IST</text>
+
+                    <!-- Conformal Prediction Band Region (15:52 to 16:04) -> X=380 to X=620 -->
+                    <rect x="380" y="24" width="240" height="76" rx="4" fill="url(#conformalGradient)"/>
+                    <line x1="380" y1="24" x2="380" y2="100" stroke="#f59e0b" stroke-width="2.5"/>
+                    <line x1="620" y1="24" x2="620" y2="100" stroke="#f59e0b" stroke-width="2.5"/>
+                    <polygon points="380,24 374,18 386,18" fill="#f59e0b"/>
+                    <polygon points="620,24 614,18 626,18" fill="#f59e0b"/>
+
+                    <!-- Probability Density Curve -->
+                    <path d="M 330,100 C 370,100 390,75 440,32 C 465,18 480,18 500,45 C 550,90 580,100 660,100" fill="url(#curveGradient)" stroke="#10b981" stroke-width="2.5"/>
+
+                    <!-- Point Estimate Pin (15:56 IST, +16m delay) at X=465 -->
+                    <line x1="465" y1="20" x2="465" y2="100" stroke="#f59e0b" stroke-width="2"/>
+                    <circle cx="465" cy="22" r="5" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5"/>
+                    <circle cx="465" cy="100" r="4" fill="#f59e0b"/>
+
+                    <!-- Callout Tag -->
+                    <g transform="translate(465, 8)">
+                      <rect x="-65" y="-12" width="130" height="22" rx="3" fill="#1c1e23" stroke="#f59e0b" stroke-width="1"/>
+                      <text x="0" y="2" fill="#f59e0b" font-family="JetBrains Mono" font-size="9.5" font-weight="700" text-anchor="middle">★ 15:56 (+16m DELAY)</text>
+                    </g>
+
+                    <text x="380" y="116" fill="#f59e0b" font-family="JetBrains Mono" font-size="9" font-weight="600" text-anchor="middle">15:52 (-4m LB)</text>
+                    <text x="620" y="116" fill="#f59e0b" font-family="JetBrains Mono" font-size="9" font-weight="600" text-anchor="middle">16:04 (+8m UB)</text>
+                  </svg>
+                </div>
+
+                <!-- Coverage Metrics Strip -->
+                <div class="conformal-meta-strip">
+                  <div class="meta-tags-left">
+                    <span class="kpi-micro-tag tag-nominal"><strong>Empirical PICP:</strong> 91.4% (14,200 Calibration Runs)</span>
+                    <span class="kpi-micro-tag tag-cyan"><strong>MPIW:</strong> 10.2 min (Narrow Window)</span>
+                    <span class="kpi-micro-tag tag-dim"><strong>&alpha; Significance:</strong> 0.10 (90% Nominal)</span>
+                  </div>
+                  <span class="font-mono text-dim text-xs">NONCONFORMITY: SPLIT CONFORMAL (NON-PARAMETRIC)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2: Section Delay Propagation & Delta Recovery -->
+            <div class="module-card">
+              <div class="module-header">
+                <div class="module-title-group">
+                  <span class="material-symbols-outlined header-icon text-secondary" aria-hidden="true">waterfall_chart</span>
+                  <div>
+                    <h3 class="module-title">SECTION DELAY PROPAGATION &amp; DELTA RECOVERY</h3>
+                    <p class="module-subtitle">Stepwise section-by-section delay differential progression</p>
+                  </div>
+                </div>
+                <span class="font-mono text-cyan text-xs font-bold">y = &Delta;d<sub>k</sub> = d<sub>k+1</sub> - d<sub>k</sub></span>
+              </div>
+
+              <!-- Cumulative Breadcrumb -->
+              <div class="cumulative-path-bar" id="cumulative-path-container">
+                <span class="text-dim">Cumulative Path:</span>
+                <span class="path-pill">Departure (0m)</span>
+                <span class="path-arrow">&rarr;</span>
+                <span class="path-pill pill-caution">Surat (+4m)</span>
+                <span class="path-arrow">&rarr;</span>
+                <span class="path-pill pill-danger">Bharuch (+18m Peak)</span>
+                <span class="path-arrow">&rarr;</span>
+                <span class="path-pill pill-caution">Vadodara (+15m)</span>
+                <span class="path-arrow">&rarr;</span>
+                <span class="path-pill pill-nominal">Ratlam (+10m Proj)</span>
+              </div>
+
+              <!-- Waterfall Blocks with Centered Zero-Line -->
+              <div class="waterfall-blocks-list">
+                <!-- Block 1: MMCT to Surat -->
+                <div class="waterfall-row">
+                  <div class="waterfall-info">
+                    <span class="waterfall-name">1. MMCT &rarr; Surat (ST)</span>
+                    <span class="waterfall-sub">Departure Dwell Overrun</span>
+                  </div>
+                  <div class="waterfall-meter-wrap">
+                    <div class="zero-center-line"></div>
+                    <div class="delta-bar-right bg-danger" style="width: 14%;"></div>
+                  </div>
+                  <div class="waterfall-val text-danger font-mono font-bold">+4 min &Delta;</div>
+                </div>
+
+                <!-- Block 2: Surat to Bharuch -->
+                <div class="waterfall-row">
+                  <div class="waterfall-info">
+                    <span class="waterfall-name">2. Surat &rarr; Bharuch (BH)</span>
+                    <span class="waterfall-sub">Speed Restr. / Track Maint. Kim</span>
+                  </div>
+                  <div class="waterfall-meter-wrap">
+                    <div class="zero-center-line"></div>
+                    <div class="delta-bar-right bg-danger" style="width: 42%;"></div>
+                  </div>
+                  <div class="waterfall-val text-danger font-mono font-bold">+14 min &Delta;</div>
+                </div>
+
+                <!-- Block 3: Bharuch to Vadodara -->
+                <div class="waterfall-row">
+                  <div class="waterfall-info">
+                    <span class="waterfall-name">3. Bharuch &rarr; Vadodara (BRC)</span>
+                    <span class="waterfall-sub">Recovery via Clear Green ABS Aspect</span>
+                  </div>
+                  <div class="waterfall-meter-wrap">
+                    <div class="zero-center-line"></div>
+                    <div class="delta-bar-left bg-nominal" style="width: 11%;"></div>
+                  </div>
+                  <div class="waterfall-val text-nominal font-mono font-bold">-3 min &Delta;</div>
+                </div>
+
+                <!-- Block 4: Vadodara to Ratlam -->
+                <div class="waterfall-row">
+                  <div class="waterfall-info">
+                    <span class="waterfall-name">4. Vadodara &rarr; Ratlam (RTM) <span class="kpi-micro-tag tag-cyan">ML Horizon</span></span>
+                    <span class="waterfall-sub">Aggressive 130 km/h Headway Profile</span>
+                  </div>
+                  <div class="waterfall-meter-wrap">
+                    <div class="zero-center-line"></div>
+                    <div class="delta-bar-left bg-nominal striped" style="width: 18%;"></div>
+                  </div>
+                  <div class="waterfall-val text-nominal font-mono font-bold">-5 min &Delta; [REC]</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RIGHT COLUMN: 35% Width (SHAP Attribution + Model Calibration) -->
+          <div class="delay-col-right">
+            
+            <!-- Card 3: SHAP Delay Attribution -->
+            <div class="module-card">
+              <div class="module-header">
+                <div class="module-title-group">
+                  <span class="material-symbols-outlined header-icon text-cyan" aria-hidden="true">schema</span>
+                  <div>
+                    <h3 class="module-title">SHAP DELAY ATTRIBUTION</h3>
+                    <p class="module-subtitle">Base Value E[f(x)] = +3.1 min · TreeSHAP Explainer</p>
+                  </div>
+                </div>
+                <span class="kpi-micro-tag tag-cyan">DIVISION W-S4</span>
+              </div>
+
+              <div class="shap-bars-container">
+                <!-- 1. Freight Preemption -->
+                <div class="shap-row">
+                  <div class="shap-label-row">
+                    <span class="shap-label">Preceding Freight Preemption (Headway Conflict)</span>
+                    <span class="shap-val text-danger font-mono font-bold">+38.2% (+9.4m)</span>
+                  </div>
+                  <div class="shap-meter"><div class="shap-fill bg-danger" style="width: 82%;"></div></div>
+                </div>
+
+                <!-- 2. Station Dwell -->
+                <div class="shap-row">
+                  <div class="shap-label-row">
+                    <span class="shap-label">Station Dwell &amp; Passenger Boarding Overflow</span>
+                    <span class="shap-val text-caution font-mono font-bold">+24.1% (+5.8m)</span>
+                  </div>
+                  <div class="shap-meter"><div class="shap-fill bg-caution" style="width: 58%;"></div></div>
+                </div>
+
+                <!-- 3. Turnout Restriction -->
+                <div class="shap-row">
+                  <div class="shap-label-row">
+                    <span class="shap-label">Turnout Speed Restriction (PSR 30km/h BRC yard)</span>
+                    <span class="shap-val text-cyan font-mono font-bold">+18.7% (+4.2m)</span>
+                  </div>
+                  <div class="shap-meter"><div class="shap-fill bg-cyan" style="width: 44%;"></div></div>
+                </div>
+
+                <!-- 4. Adverse Weather -->
+                <div class="shap-row">
+                  <div class="shap-label-row">
+                    <span class="shap-label">Adverse Micro-Weather (Wet Rail / Adhesion Loss)</span>
+                    <span class="shap-val text-ai font-mono font-bold">+11.0% (+2.6m)</span>
+                  </div>
+                  <div class="shap-meter"><div class="shap-fill bg-ai" style="width: 28%;"></div></div>
+                </div>
+
+                <!-- 5. Loco Tractive Effort -->
+                <div class="shap-row">
+                  <div class="shap-label-row">
+                    <span class="shap-label">Loco Tractive Effort Discrepancy</span>
+                    <span class="shap-val text-dim font-mono font-bold">+8.0% (+1.9m)</span>
+                  </div>
+                  <div class="shap-meter"><div class="shap-fill bg-dim" style="width: 19%;"></div></div>
+                </div>
+              </div>
+
+              <button class="btn-shap-simulate" id="btn-shap-simulate" title="Simulate Siding Reroute (HotKey F3)">
+                <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">tune</span>
+                <span>[F3] SIMULATE FREIGHT SIDING REROUTE (-7.2 min mitigation)</span>
+              </button>
+            </div>
+
+            <!-- Card 4: Model Calibration & Convergence Health -->
+            <div class="module-card">
+              <div class="module-header">
+                <div class="module-title-group">
+                  <span class="material-symbols-outlined header-icon text-nominal" aria-hidden="true">verified</span>
+                  <div>
+                    <h3 class="module-title">MODEL CALIBRATION HEALTH</h3>
+                    <p class="module-subtitle">Continuous Online Calibration · Indian Railways Graph</p>
+                  </div>
+                </div>
+                <span class="status-chip chip-nominal">CONVERGED</span>
+              </div>
+
+              <div class="calibration-grid">
+                <div class="cal-cell">
+                  <span class="cal-label">VALIDATION LOSS</span>
+                  <span class="cal-val font-mono text-nominal" id="cal-val-loss">0.024 <span class="unit">MSE</span></span>
+                </div>
+                <div class="cal-cell">
+                  <span class="cal-label">DRIFT METRIC</span>
+                  <span class="cal-val font-mono text-cyan" id="cal-drift-metric">92.4% <span class="unit">OTP</span></span>
+                </div>
+                <div class="cal-cell">
+                  <span class="cal-label">CHECKPOINT</span>
+                  <span class="cal-val font-mono text-ink" id="cal-checkpoint">LIVE <span class="unit">IST</span></span>
+                </div>
+                <div class="cal-cell">
+                  <span class="cal-label">MODEL ENSEMBLE</span>
+                  <span class="cal-val font-mono text-nominal" id="cal-nodes-synced">60% LGBM + 40% ST-GCN</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- =================================================================
+           VIEW 4: ALERT & DISRUPTION HUB (Stitch Screen 184afd1aaa2045a7af70c6dae154bcb3)
+           ================================================================= -->
+      <section class="content-view" id="view-alerts" aria-labelledby="alerts-heading">
+        <h2 id="alerts-heading" class="sr-only">Alert &amp; Disruption Hub</h2>
+
+        <div class="alerts-hub-workspace">
+          
+          <!-- Column 1: Live Incident Stream (32%) -->
+          <div class="alerts-col-stream">
+            <div class="module-card h-full">
+              <div class="module-header">
+                <div class="module-title-group">
+                  <span class="material-symbols-outlined header-icon text-danger" aria-hidden="true">warning</span>
+                  <h3 class="module-title">LIVE INCIDENT STREAM</h3>
+                </div>
+                <span class="font-mono text-dim text-xs">500ms RTK POLL</span>
+              </div>
+
+              <!-- Severity Filter Pills & Search -->
+              <div class="alerts-filter-row">
+                <div class="incident-pills" role="group" aria-label="Filter incidents">
+                  <button class="inc-pill active" data-inc-filter="all">ALL (14)</button>
+                  <button class="inc-pill pill-danger-btn" data-inc-filter="crit">
+                    <span class="pulse-indicator-danger" aria-hidden="true"></span>
+                    <span>CRIT (3)</span>
+                  </button>
+                  <button class="inc-pill pill-caution-btn" data-inc-filter="warn">WARN (6)</button>
+                  <button class="inc-pill" data-inc-filter="info">INFO (5)</button>
+                </div>
+                <input type="text" id="inc-search-input" class="inc-search-box font-mono" placeholder="Filter train / block..." aria-label="Search incidents" />
+              </div>
+
+              <!-- Scrollable Stream List -->
+              <div class="incident-items-list" id="incident-items-container" role="feed" aria-label="Active Incidents">
+                <!-- Item 1: Critical Signal Interlocking Failure -->
+                <div class="incident-card active-triage" tabindex="0" role="button" aria-label="Signal Interlocking Failure Block 14B">
+                  <div class="inc-card-top">
+                    <span class="kpi-micro-tag tag-danger">CRITICAL · SIGNAL INTERLOCKING FAILURE</span>
+                    <span class="inc-time font-mono text-danger">14:24:12 IST (4m ago)</span>
+                  </div>
+                  <h4 class="inc-card-title">Western Corridor: Bharuch (BH) – Vadodara (BRC) Block 14B</h4>
+                  <p class="inc-card-desc">Est. Network Delay: <strong class="text-danger font-mono">+18.4 min</strong> · 3 Passenger Rakes Held</p>
+                  <div class="inc-card-footer">
+                    <div class="inc-tags">
+                      <span class="inc-tag">[AFTC Drop]</span>
+                      <span class="inc-tag">[Signal S-42]</span>
+                      <span class="inc-tag">[Track Circuit]</span>
+                    </div>
+                    <span class="inc-triage-tag">ACTIVE TRIAGE &rarr;</span>
+                  </div>
+                </div>
+
+                <!-- Item 2: Warning Dwell Overrun -->
+                <div class="incident-card card-caution-border" tabindex="0" role="button" aria-label="Unscheduled Extended Dwell Surat">
+                  <div class="inc-card-top">
+                    <span class="kpi-micro-tag tag-caution">WARNING · EXTENDED DWELL</span>
+                    <span class="inc-time font-mono text-dim">14:18:05 IST (10m ago)</span>
+                  </div>
+                  <h4 class="inc-card-title">Surat (ST) Platform 1 · Train #22953 Gujarat Superfast</h4>
+                  <p class="inc-card-desc">Est. Delay Impact: <strong class="text-caution font-mono">+6.2 min</strong> · Platform Headway Conflict</p>
+                  <div class="inc-card-footer">
+                    <div class="inc-tags">
+                      <span class="inc-tag">[Luggage Clearance]</span>
+                      <span class="inc-tag">[Section W-S3]</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Item 3: Warning Dead-Reckoning Link Fallback -->
+                <div class="incident-card card-caution-border" tabindex="0" role="button" aria-label="Dead Reckoning Link Fallback">
+                  <div class="inc-card-top">
+                    <span class="kpi-micro-tag tag-caution">WARNING · DEAD-RECKONING FALLBACK</span>
+                    <span class="inc-time font-mono text-dim">14:12:30 IST (16m ago)</span>
+                  </div>
+                  <h4 class="inc-card-title">Godhra – Dahod Ghat Section · Train #12952 Tejas Rajdhani</h4>
+                  <p class="inc-card-desc">Cellular drop; edge ring-buffer active (84 packets buffered)</p>
+                  <div class="inc-card-footer">
+                    <div class="inc-tags">
+                      <span class="inc-tag">[LTE-R Outage]</span>
+                      <span class="inc-tag">[KAVACH Local Sync]</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Item 4: Info OHE Voltage Sag -->
+                <div class="incident-card" tabindex="0" role="button" aria-label="OHE Voltage Sag">
+                  <div class="inc-card-top">
+                    <span class="kpi-micro-tag tag-cyan">INFO · OHE VOLTAGE SAG (NEUTRAL)</span>
+                    <span class="inc-time font-mono text-dim">14:02:11 IST (26m ago)</span>
+                  </div>
+                  <h4 class="inc-card-title">Anand – Vadodara Substation TSS-03</h4>
+                  <p class="inc-card-desc">Voltage normalized to 24.8 kV (Nominal). Traction cleared.</p>
+                  <div class="inc-card-footer">
+                    <div class="inc-tags">
+                      <span class="inc-tag">[Traction Power]</span>
+                      <span class="inc-tag">[Substation 03]</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Column 2: Active Incident Triage & Live Track Topology SVG (42%) -->
+          <div class="alerts-col-triage">
+            <div class="module-card h-full">
+              <div class="triage-card-header" id="triage-card-header">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono text-xs text-dim bg-paper-card px-2 py-0.5 rounded" id="triage-incident-badge">INCIDENT #INC-2024-0892B</span>
+                    <span class="kpi-micro-tag tag-danger" id="triage-status-tag">ACTIVE TRIAGE IN PROGRESS</span>
+                  </div>
+                  <h3 class="triage-title" id="triage-title">Signal Interlocking Block 14B Fail-Safe Reversion to Danger</h3>
+                </div>
+              </div>
+
+              <!-- Live Block Topology Diagram SVG -->
+              <div class="triage-svg-wrap" id="triage-svg-container">
+                <div class="flex items-center justify-between text-xs font-mono text-dim mb-1">
+                  <span>BHARUCH (BH) <strong class="text-slate-100">KM 312</strong></span>
+                  <span class="text-danger font-bold flex items-center gap-1">
+                    <span class="pulse-indicator-danger" aria-hidden="true"></span>
+                    BLOCK 14B: OCCUPIED / LOCKED RED
+                  </span>
+                  <span>VADODARA (BRC) <strong class="text-slate-100">KM 392</strong></span>
+                </div>
+
+                <div class="triage-svg-viewport">
+                  <svg viewBox="0 0 420 110" class="triage-svg" aria-label="Incident interlocking diagram">
+                    <defs>
+                      <linearGradient id="blockedGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.1"/>
+                        <stop offset="50%" stop-color="#ef4444" stop-opacity="0.4"/>
+                        <stop offset="100%" stop-color="#ef4444" stop-opacity="0.1"/>
+                      </linearGradient>
+                    </defs>
+
+                    <!-- Main Track -->
+                    <line x1="20" y1="40" x2="400" y2="40" stroke="#334155" stroke-width="2.5"/>
+                    <!-- Siding Bypass Track -->
+                    <line x1="20" y1="75" x2="400" y2="75" stroke="#334155" stroke-dasharray="3,3" stroke-width="1.5"/>
+                    <!-- Switch Divert Path -->
+                    <path d="M 140,40 L 190,75 L 340,75" fill="none" stroke="#f59e0b" stroke-dasharray="2,2" stroke-width="2"/>
+
+                    <!-- Blocked Glow -->
+                    <rect x="150" y="27" width="120" height="26" rx="2" fill="url(#blockedGlow)"/>
+                    <line x1="150" y1="40" x2="270" y2="40" stroke="#ef4444" stroke-width="4"/>
+                    <text x="210" y="34" fill="#f87171" font-family="JetBrains Mono" font-size="8.5" font-weight="700" text-anchor="middle">! BLOCK 14B LOCKED RED !</text>
+
+                    <!-- Train #12952 Held -->
+                    <rect x="90" y="33" width="45" height="15" rx="2" fill="#f59e0b"/>
+                    <text x="112" y="44" fill="#040a14" font-family="JetBrains Mono" font-size="8" font-weight="700" text-anchor="middle">#12952</text>
+
+                    <!-- Signal S-42 (Red) -->
+                    <circle cx="145" cy="28" r="4.5" fill="#ef4444" stroke="#000" stroke-width="1"/>
+                    <text x="145" y="20" fill="#ef4444" font-family="JetBrains Mono" font-size="7.5" font-weight="700" text-anchor="middle">S-42 (RED)</text>
+
+                    <!-- Signal S-40 (Double Yellow) -->
+                    <circle cx="70" cy="28" r="3.5" fill="#f59e0b"/>
+                    <circle cx="70" cy="20" r="3.5" fill="#f59e0b"/>
+                    <text x="50" y="15" fill="#f59e0b" font-family="JetBrains Mono" font-size="7">S-40 (YY)</text>
+
+                    <!-- Siding-01 -->
+                    <rect x="220" y="69" width="40" height="13" rx="1.5" fill="#1e293b" stroke="#64748b"/>
+                    <text x="240" y="79" fill="#ffffff" font-family="JetBrains Mono" font-size="7.5" text-anchor="middle">SIDING-01</text>
+                    <text x="280" y="92" fill="#f59e0b" font-family="JetBrains Mono" font-size="8">Loop Track 3 (Clear &amp; Interlocked)</text>
+                  </svg>
+                </div>
+              </div>
+
+              <!-- Root Cause Telemetry Analysis -->
+              <div class="root-cause-box" id="triage-root-cause">
+                <div class="flex items-center gap-1 text-danger font-bold text-xs mb-1">
+                  <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">build_circle</span>
+                  <span>Root Cause Telemetry Analysis</span>
+                </div>
+                <p class="text-xs text-secondary leading-snug">
+                  Audio Frequency Track Circuit (AFTC) dropped feedback pulse at MP 348.6. Signal S-42 fail-safe auto-reverted to RED aspect.
+                </p>
+                <span class="font-mono text-dim text-xs mt-1 block">ST-GCN Confidence: <strong class="text-nominal">99.4%</strong> · Hardware Telemetry Disconnect</span>
+              </div>
+
+              <!-- Affected Services Queue -->
+              <div class="affected-queue-box" id="triage-affected-queue">
+                <span class="queue-title">Affected Services in Corridor Queue (3 Consists)</span>
+                <div class="queue-list">
+                  <div class="queue-item">
+                    <span class="kpi-micro-tag tag-cyan">P1 EXPRESS</span>
+                    <span class="font-mono text-ink font-bold">Train #12952 (Tejas Rajdhani)</span>
+                    <span class="text-dim">Held Outer S-42</span>
+                    <span class="text-danger font-mono font-bold">+14m</span>
+                  </div>
+                  <div class="queue-item">
+                    <span class="kpi-micro-tag tag-dim">P3 FREIGHT</span>
+                    <span class="font-mono text-ink">BOXN-1102 Heavy Freight</span>
+                    <span class="text-dim">Held Loop Siding</span>
+                    <span class="text-danger font-mono font-bold">+28m</span>
+                  </div>
+                  <div class="queue-item">
+                    <span class="kpi-micro-tag tag-nominal">P1 EXPRESS</span>
+                    <span class="font-mono text-ink">Train #12951 (NDLS Rajdhani)</span>
+                    <span class="text-dim">Approaching BRC</span>
+                    <span class="text-caution font-mono font-bold">+3m</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Operator Emergency Actions -->
+              <div class="emergency-actions-grid" id="triage-actions-grid">
+                <button class="btn-emergency-action danger" id="btn-issue-caution">
+                  <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">warning</span>
+                  <span>Issue Emergency Caution Order (CO-15km/h)</span>
+                </button>
+                <div class="action-btn-row">
+                  <button class="btn-emergency-action cyan" id="btn-divert-siding">
+                    <span class="material-symbols-outlined" style="font-size: 15px;" aria-hidden="true">alt_route</span>
+                    <span>Route Divert to Track 3</span>
+                  </button>
+                  <button class="btn-emergency-action slate" id="btn-dispatch-st">
+                    <span class="material-symbols-outlined" style="font-size: 15px;" aria-hidden="true">engineering</span>
+                    <span>Dispatch S&amp;T Team</span>
+                  </button>
+                </div>
+                <button class="btn-emergency-mute" id="btn-mute-alert">
+                  <span class="material-symbols-outlined" style="font-size: 14px;" aria-hidden="true">notifications_off</span>
+                  <span>Acknowledge &amp; Mute Alert Tone (10m)</span>
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Column 3: Chronological Audit Trail & Escalation Log (26%) -->
+          <div class="alerts-col-audit">
+            <div class="module-card h-full">
+              <div class="module-header">
+                <div class="module-title-group">
+                  <span class="material-symbols-outlined header-icon text-cyan" aria-hidden="true">history_edu</span>
+                  <h3 class="module-title">AUDIT TRAIL &amp; DISPATCH LOG</h3>
+                </div>
+                <span class="kpi-micro-tag tag-nominal">SYNCED</span>
+              </div>
+
+              <!-- Vertical Timeline -->
+              <div class="audit-timeline-list" id="audit-timeline-container">
+                <div class="timeline-event">
+                  <span class="event-dot bg-cyan"></span>
+                  <span class="event-time font-mono text-cyan">14:26:01 IST</span>
+                  <p class="event-desc">S&amp;T Vadodara Depot notified by Controller Desk (Auto-Ack logged)</p>
+                </div>
+
+                <div class="timeline-event">
+                  <span class="event-dot bg-caution"></span>
+                  <span class="event-time font-mono text-caution">14:25:10 IST</span>
+                  <p class="event-desc">Auto-caution packet transmitted to #12952 Cab (Kavach TCAS Sync)</p>
+                </div>
+
+                <div class="timeline-event">
+                  <span class="event-dot bg-danger"></span>
+                  <span class="event-time font-mono text-danger">14:24:12 IST</span>
+                  <p class="event-desc">Telemetry alert generated by ST-GCN (AFTC feedback pulse dropped)</p>
+                </div>
+
+                <div class="timeline-event">
+                  <span class="event-dot bg-dim"></span>
+                  <span class="event-time font-mono text-dim">14:20:00 IST</span>
+                  <p class="event-desc">Routine interlocking poll nominal (50Hz heartbeat)</p>
+                </div>
+              </div>
+
+              <!-- Escalation Status -->
+              <div class="escalation-status-box">
+                <div class="esc-header">
+                  <span class="text-dim text-xs font-mono font-bold">ESCALATION CHAIN STATUS</span>
+                  <span class="text-nominal font-mono text-xs font-bold">LEVEL 1: ACTIVE</span>
+                </div>
+                <div class="esc-item">
+                  <span class="text-secondary">Current Handler:</span>
+                  <span class="text-ink font-bold">Section Controller (Desk-01)</span>
+                </div>
+                <div class="esc-item">
+                  <span class="text-dim">Escalate to Sr. DOM:</span>
+                  <span class="text-danger font-mono font-bold" id="escalation-timer-text">05:48 rem</span>
+                </div>
+              </div>
+
+              <!-- Custody Sign-Off -->
+              <div class="custody-box" id="custody-box-container">
+                <span class="text-dim text-xs font-mono font-bold block mb-1">CUSTODY &amp; SIGN-OFF</span>
+                <p class="text-xs text-ink font-medium">Chief Controller DS-04 (Mumbai Central CTC)</p>
+                <p class="text-xs text-cyan font-mono">Chief Controller: T. Bhatt (ChC/WR/MMCT)</p>
+                <span class="text-dim text-xs font-mono block mt-1">Shift B Active: 14:00:00 IST</span>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- =================================================================
+           VIEW 5: DEAD-RECKONING & EDGE TELEMETRY CONSOLE (Stitch Screen 22f0ecfbb9a34fa2976bc6901234596d)
+           ================================================================= -->
+      <section class="content-view" id="view-dead-reckoning" aria-labelledby="telemetry-heading">
+        <h2 id="telemetry-heading" class="sr-only">Autonomous Edge Telemetry and Dead-Reckoning Console</h2>
+
+        <div class="telemetry-console-workspace">
+          
+          <!-- 4 KPI Summary Cards -->
+          <div class="telemetry-kpi-row">
+            <!-- Metric 1: Total Active Rakes -->
+            <div class="kpi-card">
+              <div class="kpi-card-header">
+                <span class="kpi-label">TOTAL ACTIVE RAKES</span>
+                <span class="material-symbols-outlined kpi-icon text-cyan" aria-hidden="true">train</span>
+              </div>
+              <div class="kpi-card-body">
+                <div class="kpi-value-row">
+                  <span class="kpi-main-val font-mono">42</span>
+                  <span class="kpi-unit">RAKES</span>
+                </div>
+                <div class="kpi-subtext">
+                  <span class="text-nominal font-bold">40 Online</span>
+                  <span class="kpi-sub-sep" aria-hidden="true">•</span>
+                  <span class="text-caution font-bold">2 Dead-Reckoning</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Metric 2: RF Coverage -->
+            <div class="kpi-card">
+              <div class="kpi-card-header">
+                <span class="kpi-label">CORRIDOR RF &amp; GSM-R COVERAGE</span>
+                <span class="material-symbols-outlined kpi-icon text-nominal" aria-hidden="true">cell_tower</span>
+              </div>
+              <div class="kpi-card-body">
+                <div class="kpi-value-row">
+                  <span class="kpi-main-val font-mono text-nominal">94.6%</span>
+                  <span class="kpi-badge-pill pill-caution">4.2 KM SHADOW</span>
+                </div>
+                <div class="kpi-subtext">
+                  <span>LTE-R Masts: <strong class="font-mono text-ink">18 / 19</strong> (TWR-89 Blind)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Metric 3: Buffered Edge Packets -->
+            <div class="kpi-card">
+              <div class="kpi-card-header">
+                <span class="kpi-label">BUFFERED EDGE BACKLOG</span>
+                <span class="material-symbols-outlined kpi-icon text-cyan" aria-hidden="true">layers</span>
+              </div>
+              <div class="kpi-card-body">
+                <div class="kpi-value-row">
+                  <span class="kpi-main-val font-mono text-cyan">226</span>
+                  <span class="kpi-unit">PKTS IN QUEUE</span>
+                </div>
+                <div class="kpi-subtext">
+                  <span>Ring-Buffer Fill: <strong class="font-mono text-nominal">3.8% (Nominal)</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Metric 4: Blind Zone Alert -->
+            <div class="kpi-card">
+              <div class="kpi-card-header">
+                <span class="kpi-label text-caution">CELLULAR BLIND ZONE ALERT</span>
+                <span class="material-symbols-outlined kpi-icon text-caution" aria-hidden="true">terrain</span>
+              </div>
+              <div class="kpi-card-body">
+                <div class="kpi-value-row">
+                  <span class="kpi-main-val font-mono text-caution" style="font-size: 1.15rem;">Ratlam Ghat</span>
+                  <span class="kpi-badge-pill pill-danger">ACTIVE</span>
+                </div>
+                <div class="kpi-subtext">
+                  <span>KM 542.0 ➔ KM 578.0 (Deep Cuttings &amp; Tunnel #4)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main EKF Matrix Split -->
+          <div class="telemetry-main-grid">
+            
+            <!-- Left: Disconnected Train Nodes Running Kalman Filter (65%) -->
+            <div class="telemetry-nodes-col">
+              <div class="module-card">
+                <div class="module-header">
+                  <div class="module-title-group">
+                    <span class="material-symbols-outlined header-icon text-cyan" aria-hidden="true">satellite_alt</span>
+                    <div>
+                      <h3 class="module-title">AUTONOMOUS EDGE TELEMETRY &amp; DEAD-RECKONING MATRIX</h3>
+                      <p class="module-subtitle">Disconnected train nodes running Extended Kalman Filter (EKF) state estimation</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="kpi-micro-tag tag-cyan">BURST ON LINK ACQ</span>
+                    <button class="btn-tactical-csv" id="btn-repoll-radios">
+                      <span class="material-symbols-outlined" style="font-size: 14px;" aria-hidden="true">refresh</span>
+                      <span>Re-poll Radios</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Train Node 1: #12952 Tejas Rajdhani -->
+                <div class="ekf-train-card">
+                  <div class="ekf-header">
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <h4 class="ekf-train-title font-mono">#12952 MMCT-NDLS TEJAS RAJDHANI</h4>
+                        <span class="kpi-micro-tag tag-caution">DEAD RECKONING ACTIVE</span>
+                        <span class="kpi-micro-tag tag-dim">LOCO: WAP-7 #30488</span>
+                      </div>
+                      <div class="ekf-meta-row">
+                        <span class="text-caution font-bold font-mono">08m 42s without Server Ack</span>
+                        <span class="kpi-sub-sep" aria-hidden="true">•</span>
+                        <span>Signal Loss: MP 554.2 (Ratlam West Portal)</span>
+                        <span class="kpi-sub-sep" aria-hidden="true">•</span>
+                        <span>22 LHB Coaches (1,040T)</span>
+                      </div>
+                    </div>
+                    <div class="ekf-actions">
+                      <button class="action-btn-small" onclick="selectTrain('12952')">Inspect Rake</button>
+                      <button class="action-btn-small primary" id="btn-ping-cab">Ping Cab VHF</button>
+                    </div>
+                  </div>
+
+                  <!-- Telemetry Grid: EKF Estimated Values -->
+                  <div class="ekf-metrics-grid">
+                    <div class="ekf-cell">
+                      <div class="flex justify-between items-center mb-1">
+                        <span class="ekf-cell-label">CALCULATED KM POST</span>
+                        <span class="kpi-micro-tag tag-caution">[EKF ESTIMATED]</span>
+                      </div>
+                      <span class="ekf-cell-val font-mono text-caution italic">KM 561.4 <span class="unit text-dim">(&plusmn;12m uncert)</span></span>
+                      <span class="ekf-cell-sub">Dual Tachometer + 6-Axis IMU</span>
+                    </div>
+
+                    <div class="ekf-cell">
+                      <div class="flex justify-between items-center mb-1">
+                        <span class="ekf-cell-label">EDGE CALCULATED SPEED</span>
+                        <span class="kpi-micro-tag tag-caution">[INERTIAL]</span>
+                      </div>
+                      <span class="ekf-cell-val font-mono text-caution italic">94 <span class="unit">KM/H</span></span>
+                      <span class="ekf-cell-sub text-nominal">Permitted PSR: 110 KM/H</span>
+                    </div>
+
+                    <div class="ekf-cell">
+                      <div class="flex justify-between items-center mb-1">
+                        <span class="ekf-cell-label">NEXT BALISE TRACK SYNC</span>
+                        <span class="kpi-micro-tag tag-cyan">[RFID B-89]</span>
+                      </div>
+                      <span class="ekf-cell-val font-mono text-cyan">KM 564.8 <span class="unit text-dim">(3.4 km rem)</span></span>
+                      <span class="ekf-cell-sub">Est. Synch Arrival: ~2m 10s</span>
+                    </div>
+
+                    <div class="ekf-cell">
+                      <div class="flex justify-between items-center mb-1">
+                        <span class="ekf-cell-label">EDGE RING-BUFFER</span>
+                        <span class="kpi-micro-tag tag-nominal">BURST READY</span>
+                      </div>
+                      <span class="ekf-cell-val font-mono text-nominal">84 <span class="unit">PACKETS</span></span>
+                      <span class="ekf-cell-sub">Will burst-dump on TWR-90 handshake</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Train Node 2: #12904 Golden Temple Mail -->
+                <div class="ekf-train-card">
+                  <div class="ekf-header">
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <h4 class="ekf-train-title font-mono">#12904 GOLDEN TEMPLE MAIL</h4>
+                        <span class="kpi-micro-tag tag-caution">DEAD RECKONING ACTIVE</span>
+                        <span class="kpi-micro-tag tag-dim">LOCO: WAP-7 #30112</span>
+                      </div>
+                      <div class="ekf-meta-row">
+                        <span class="text-caution font-bold font-mono">03m 15s without Server Ack</span>
+                        <span class="kpi-sub-sep" aria-hidden="true">•</span>
+                        <span>Signal Loss: MP 546.0 (Dahod Tunnel Entry)</span>
+                      </div>
+                    </div>
+                    <div class="ekf-actions">
+                      <button class="action-btn-small" onclick="selectTrain('12904')">Inspect Rake</button>
+                    </div>
+                  </div>
+
+                  <div class="ekf-metrics-grid">
+                    <div class="ekf-cell">
+                      <div class="flex justify-between items-center mb-1">
+                        <span class="ekf-cell-label">CALCULATED KM POST</span>
+                        <span class="kpi-micro-tag tag-caution">[EKF ESTIMATED]</span>
+                      </div>
+                      <span class="ekf-cell-val font-mono text-caution italic">KM 548.2 <span class="unit text-dim">(&plusmn;6m uncert)</span></span>
+                    </div>
+                    <div class="ekf-cell">
+                      <div class="flex justify-between items-center mb-1">
+                        <span class="ekf-cell-label">EDGE INERTIAL SPEED</span>
+                        <span class="kpi-micro-tag tag-caution">[INERTIAL]</span>
+                      </div>
+                      <span class="ekf-cell-val font-mono text-caution italic">88 <span class="unit">KM/H</span></span>
+                    </div>
+                    <div class="ekf-cell">
+                      <div class="flex justify-between items-center mb-1">
+                        <span class="ekf-cell-label">NEXT BALISE TRACK SYNC</span>
+                        <span class="kpi-micro-tag tag-cyan">[RFID B-84]</span>
+                      </div>
+                      <span class="ekf-cell-val font-mono text-cyan">KM 550.0 <span class="unit text-dim">(1.8 km rem)</span></span>
+                    </div>
+                    <div class="ekf-cell">
+                      <div class="flex justify-between items-center mb-1">
+                        <span class="ekf-cell-label">EDGE RING-BUFFER</span>
+                        <span class="kpi-micro-tag tag-nominal">BURST READY</span>
+                      </div>
+                      <span class="ekf-cell-val font-mono text-nominal">32 <span class="unit">PACKETS</span></span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Right: Sensor Fusion Health & Raw Packet Stream (35%) -->
+            <div class="telemetry-diagnostics-col">
+              <div class="module-card">
+                <div class="module-header">
+                  <div class="module-title-group">
+                    <span class="material-symbols-outlined header-icon text-nominal" aria-hidden="true">sensors</span>
+                    <h3 class="module-title">LOCO SENSOR FUSION HEALTH</h3>
+                  </div>
+                  <span class="kpi-micro-tag tag-nominal">CALIBRATED</span>
+                </div>
+
+                <div class="sensor-health-list">
+                  <div class="sensor-health-row">
+                    <div>
+                      <span class="sensor-title">6-Axis IMU Accelerometer</span>
+                      <span class="sensor-sub">Noise floor 0.02 m/s&sup2; bias compensated</span>
+                    </div>
+                    <span class="status-chip chip-nominal">NOMINAL</span>
+                  </div>
+
+                  <div class="sensor-health-row">
+                    <div>
+                      <span class="sensor-title">Dual Wheel Tachometers (Axles 1 &amp; 6)</span>
+                      <span class="sensor-sub">0.14% slip/slide delta compensated</span>
+                    </div>
+                    <span class="status-chip chip-nominal">NOMINAL</span>
+                  </div>
+
+                  <div class="sensor-health-row">
+                    <div>
+                      <span class="sensor-title">Kavach RFID Balise Transceiver</span>
+                      <span class="sensor-sub">-68 dBm signal sensitivity</span>
+                    </div>
+                    <span class="status-chip chip-nominal">ARMED</span>
+                  </div>
+
+                  <div class="sensor-health-row">
+                    <div>
+                      <span class="sensor-title">NavIC / GPS Dual Carrier Receiver</span>
+                      <span class="sensor-sub">0 Sats in Tunnel #4 (Fallback to EKF)</span>
+                    </div>
+                    <span class="status-chip chip-caution">NO FIX</span>
+                  </div>
+                </div>
+
+                <!-- Raw Packet Stream Monitor -->
+                <div class="packet-stream-card">
+                  <div class="flex items-center justify-between mb-1 text-xs font-mono">
+                    <span class="text-dim font-bold">EDGE TELEMETRY RING BUFFER (HEX)</span>
+                    <span class="text-cyan font-bold" id="packet-buffer-counter">84 PKTS BUFFERED</span>
+                  </div>
+                  <pre class="packet-stream-code" id="packet-stream-display">
+0xAA55 [SEQ: 14820] LAT: 23.3344 LON: 75.0374 SPD: 94.2 BRAKE: 4.8kg BALISE_DIST: 3400m
+0xAA55 [SEQ: 14821] LAT: 23.3346 LON: 75.0379 SPD: 94.1 BRAKE: 4.8kg BALISE_DIST: 3375m
+0xAA55 [SEQ: 14822] LAT: 23.3348 LON: 75.0384 SPD: 94.0 BRAKE: 4.8kg BALISE_DIST: 3350m
+0xAA55 [SEQ: 14823] LAT: 23.3350 LON: 75.0389 SPD: 94.0 BRAKE: 4.8kg BALISE_DIST: 3325m
+[EDGE BUFFER STANDBY — AWAITING TWR-90 RF CARRIER LINK ACQUISITION]</pre>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- =================================================================
+           VIEW 6: MASTER TRAIN MOVEMENT CONSOLE (Full Master Table View)
+           ================================================================= -->
+      <section class="content-view" id="view-trains" aria-labelledby="trains-heading">
+        <h2 id="trains-heading" class="sr-only">Master Train Movement Console</h2>
+        <div class="module-card full-page-module">
+          <div class="module-header">
+            <div class="module-title-group">
+              <span class="material-symbols-outlined header-icon" aria-hidden="true">directions_railway</span>
+              <h3 class="module-title">MASTER TRAIN MOVEMENT CONSOLE — WESTERN &amp; NORTHERN CORRIDORS</h3>
+              <span class="count-chip">24 SCHEDULED ROSTER</span>
+            </div>
+            <div class="table-toolbar">
+              <input type="text" id="master-search-input" class="search-box font-mono" placeholder="Search train #, name, or platform..." aria-label="Search trains" />
+              <div class="filter-pill-group" role="group" aria-label="Filter roster">
+                <button class="pill-btn active" data-filter="all">All</button>
+                <button class="pill-btn" data-filter="up">UP Line</button>
+                <button class="pill-btn" data-filter="dn">DN Line</button>
+                <button class="pill-btn" data-filter="delayed">Delayed</button>
+              </div>
+              <button class="action-btn-small" id="btn-export-csv-master">
+                <span class="material-symbols-outlined" style="font-size: 14px;" aria-hidden="true">download</span>
+                <span>Export CSV</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="table-scroll-full">
+            <table class="telemetry-table" id="master-movement-table">
+              <thead>
+                <tr>
+                  <th>TRAIN #</th>
+                  <th>TRAIN NAME</th>
+                  <th>TYPE</th>
+                  <th>RAKE COMPOSITION</th>
+                  <th>FROM</th>
+                  <th>TO</th>
+                  <th>LINE</th>
+                  <th>PF</th>
+                  <th>SCHED</th>
+                  <th>ACTUAL</th>
+                  <th>DELAY</th>
+                  <th class="text-right">SPEED</th>
+                  <th>CURRENT BLOCK</th>
+                  <th>NEXT SIGNAL</th>
+                  <th>STATUS</th>
+                </tr>
+              </thead>
+              <tbody id="master-table-body">
+                <!-- Dynamically populated via app.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================
+           VIEW 7: SHIFT HANDOVER & LOGS CONSOLE (Stitch Screen eabfc55fd0b84da3b5f7942dceb3f174)
+           ================================================================= -->
+      <section class="content-view" id="view-settings" aria-labelledby="settings-heading">
+        <h2 id="settings-heading" class="sr-only">Divisional Control Jurisdiction &amp; Operational Units</h2>
+        
+        <div class="settings-workspace" style="display:flex; flex-direction:column; gap:var(--space-md);">
+          <!-- Master Container Card -->
+          <div class="module-card full-page-module">
+            <div class="module-header" style="flex-wrap:wrap; gap:10px;">
+              <div class="module-title-group">
+                <span class="material-symbols-outlined header-icon text-cyan" aria-hidden="true">account_tree</span>
+                <div>
+                  <h3 class="module-title" id="jurisdiction-title">DIVISIONAL CONTROL OFFICE — MUMBAI DIVISION (WR)</h3>
+                  <p class="text-xs text-dim font-mono" id="jurisdiction-hq" style="margin-top:2px;">HQ: Mumbai Central CTC (MMCT-CTC), Churchgate, Mumbai - 400 020</p>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="status-chip chip-nominal" id="jurisdiction-shift-chip">SHIFT B (14:00 IST) • OFFICER: T. BHATT</span>
+                <span class="status-chip chip-ai" id="jurisdiction-trains-chip">8 ACTIVE TRAINS MONITORED</span>
+              </div>
+            </div>
+
+            <!-- Integrated Control Grid -->
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: var(--space-md); padding: var(--space-md);">
+              
+              <!-- Subcard 1: Hierarchical Command Structure (Divisional Level) -->
+              <div class="sub-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--color-rule); padding-bottom:8px;">
+                  <h4 class="sub-card-title" style="display:flex; align-items:center; gap:6px;">
+                    <span class="material-symbols-outlined text-cyan" style="font-size:18px;">badge</span>
+                    Divisional Command Hierarchy (Level 3)
+                  </h4>
+                  <span class="text-xs font-mono text-cyan" style="background:rgba(0,229,255,0.08); padding:2px 8px; border-radius:4px; border:1px solid rgba(0,229,255,0.2);">MMCT-CTC</span>
+                </div>
+                
+                <div id="command-roster-list" style="display:flex; flex-direction:column; gap:6px; margin-top:6px;">
+                  <!-- Dynamically populated via loadJurisdictionData -->
+                  <div class="pref-row">
+                    <div>
+                      <span class="font-bold text-ink" style="font-size:12px;">Chief Controller (ChC)</span>
+                      <span class="text-dim font-mono block text-xs">Overall Section Authority &amp; Punctuality</span>
+                    </div>
+                    <div class="text-right">
+                      <span class="font-mono text-cyan" style="font-weight:600;">T. Bhatt</span>
+                      <span class="status-chip chip-nominal" style="margin-left:6px; font-size:10px;">DESK DS-04</span>
+                    </div>
+                  </div>
+
+                  <div class="pref-row">
+                    <div>
+                      <span class="font-bold text-ink" style="font-size:12px;">Dy. Chief Controller (Dy.ChC)</span>
+                      <span class="text-dim font-mono block text-xs">Section Movements &amp; Handover Coordination</span>
+                    </div>
+                    <div class="text-right">
+                      <span class="font-mono text-cyan" style="font-weight:600;">M. Joshi</span>
+                      <span class="status-chip chip-nominal" style="margin-left:6px; font-size:10px;">DESK DS-03</span>
+                    </div>
+                  </div>
+
+                  <div class="pref-row">
+                    <div>
+                      <span class="font-bold text-ink" style="font-size:12px;">Traction Power Controller (TPC)</span>
+                      <span class="text-dim font-mono block text-xs">25kV AC Traction &amp; Substation SCADA</span>
+                    </div>
+                    <div class="text-right">
+                      <span class="font-mono text-cyan" style="font-weight:600;">H. Pillai</span>
+                      <span class="status-chip chip-nominal" style="margin-left:6px; font-size:10px;">DESK TPC-01</span>
+                    </div>
+                  </div>
+
+                  <div class="pref-row">
+                    <div>
+                      <span class="font-bold text-ink" style="font-size:12px;">Traction Loco Controller (TLC)</span>
+                      <span class="text-dim font-mono block text-xs">WAP-7 / WAG-9 Power &amp; Crew Balancing</span>
+                    </div>
+                    <div class="text-right">
+                      <span class="font-mono text-cyan" style="font-weight:600;">B. Singh</span>
+                      <span class="status-chip chip-nominal" style="margin-left:6px; font-size:10px;">DESK TLC-01</span>
+                    </div>
+                  </div>
+
+                  <div class="pref-row" style="border-bottom:none;">
+                    <div>
+                      <span class="font-bold text-ink" style="font-size:12px;">Carriage &amp; Wagon Controller (C&amp;W)</span>
+                      <span class="text-dim font-mono block text-xs">Rake Fitness, Hot Axle / BPC Telemetry</span>
+                    </div>
+                    <div class="text-right">
+                      <span class="font-mono text-cyan" style="font-weight:600;">S. Gupta</span>
+                      <span class="status-chip chip-nominal" style="margin-left:6px; font-size:10px;">DESK CW-01</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="margin-top:10px; padding:10px; background:var(--color-surface-subtle); border-radius:var(--radius-card); border:1px solid var(--color-rule-subtle);">
+                  <span class="text-xs text-dim font-mono" style="display:block; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.05em;">Connected Core Railway Systems:</span>
+                  <div id="connected-systems-chips" style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <span class="status-chip chip-nominal" style="font-size:10px;">COA Automation</span>
+                    <span class="status-chip chip-nominal" style="font-size:10px;">RTIS GPS (ISRO)</span>
+                    <span class="status-chip chip-nominal" style="font-size:10px;">FOIS Freight</span>
+                    <span class="status-chip chip-nominal" style="font-size:10px;">NaMOPS</span>
+                    <span class="status-chip chip-nominal" style="font-size:10px;">KAVACH SIL-4</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Subcard 2: Operational Shift Handover Checklist -->
+              <div class="sub-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--color-rule); padding-bottom:8px;">
+                  <h4 class="sub-card-title" style="display:flex; align-items:center; gap:6px;">
+                    <span class="material-symbols-outlined text-nominal" style="font-size:18px;">fact_check</span>
+                    Shift B Handover Checklist
+                  </h4>
+                  <span class="text-xs font-mono text-nominal" id="handover-shift-tag">14:00 - 22:00 IST</span>
+                </div>
+                
+                <div class="checklist-box" style="margin-top:8px;">
+                  <label class="check-item"><input type="checkbox" checked /> WR-S1 (MMCT-BRC): All suburban EMUs and 12951 Tejas Raj locks validated on COA.</label>
+                  <label class="check-item"><input type="checkbox" checked /> WR-S2 (BRC-RTM): Godhra-Ratlam ghat caution order (CO-15km/h) confirmed in cab.</label>
+                  <label class="check-item"><input type="checkbox" checked /> WR-S3 (RTM-KOTA): Chambal viaduct dead-reckoning telemetry continuous via EKF.</label>
+                  <label class="check-item"><input type="checkbox" checked /> NR-S4 (KOTA-NDLS): Inter-zonal handshake active with Delhi Division Control.</label>
+                  <label class="check-item"><input type="checkbox" /> Traction OHE isolators at Vadodara Yard confirmed energized by TPC.</label>
+                </div>
+                
+                <div class="mt-3 flex items-center justify-between" style="border-top:1px solid var(--color-rule-subtle); padding-top:10px;">
+                  <span class="text-xs text-dim font-mono" id="handover-officer-label">Handover Officer: T. Bhatt (ChC)</span>
+                  <button class="action-btn-small primary" onclick="alert('Shift Handover Acknowledged & Signed by Chief Controller T. Bhatt')">Sign &amp; Complete Handover</button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Full-Width Subcard 3: Line-Wise (Section-Wise) Operational Units -->
+            <div style="padding: 0 var(--space-md) var(--space-md) var(--space-md);">
+              <div class="sub-card" style="background:var(--color-canvas);">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--color-rule); padding-bottom:10px;">
+                  <div>
+                    <h4 class="sub-card-title" style="display:flex; align-items:center; gap:8px;">
+                      <span class="material-symbols-outlined text-cyan" style="font-size:20px;">alt_route</span>
+                      Line-Wise Operational Units (4 Territorial Sections)
+                    </h4>
+                    <p class="text-xs text-dim" style="margin-top:2px;">Each section controller directs train movement, loops, precedence, and safety locks inside their territorial boundary.</p>
+                  </div>
+                  <span class="status-chip chip-nominal font-mono" id="total-sections-badge">4 DESKS ACTIVE • 8 TRAINS ALLOCATED</span>
+                </div>
+
+                <!-- Section Units Grid -->
+                <div id="section-units-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap:14px; margin-top:14px;">
+                  <!-- Rendered dynamically by loadJurisdictionData -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Subcard 4: SCADA & Kavach Infrastructure -->
+            <div style="padding: 0 var(--space-md) var(--space-md) var(--space-md);">
+              <div class="sub-card">
+                <h4 class="sub-card-title" style="display:flex; align-items:center; gap:6px;">
+                  <span class="material-symbols-outlined text-ai" style="font-size:18px;">dns</span>
+                  Control Office SCADA &amp; Kavach 4.0 Infrastructure
+                </h4>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-top:6px;">
+                  <div class="pref-row">
+                    <span>MQTT SCADA Broker</span>
+                    <span class="status-chip chip-nominal">CLUSTER ONLINE (3 NODES)</span>
+                  </div>
+                  <div class="pref-row">
+                    <span>Kafka Telemetry Stream</span>
+                    <span class="font-mono text-cyan">50 Hz (20ms latency)</span>
+                  </div>
+                  <div class="pref-row">
+                    <span>Kavach SIL-4 Failover</span>
+                    <span class="status-chip chip-nominal">TRIPLE REDUNDANT</span>
+                  </div>
+                  <div class="pref-row">
+                    <span>ST-GCN AI Interval</span>
+                    <span class="font-mono text-ai">90% Confidence Interval</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- =====================================================================
+         3. SLIDE-IN TRAIN DETAIL INSPECTOR DRAWER (Stitch Screen Final)
+         ===================================================================== -->
+    <aside class="inspector-drawer" id="train-inspector-drawer" aria-label="Train Detail Inspector" aria-hidden="true">
+      <div class="drawer-header">
+        <div>
+          <span class="drawer-subtitle font-mono">TRAIN DETAIL INSPECTOR</span>
+          <h3 class="drawer-train-title" id="drawer-title">12951 RAJDHANI EXP</h3>
+        </div>
+        <button class="drawer-close-btn" id="btn-close-drawer" title="Close Drawer" aria-label="Close Inspector Drawer">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </div>
+
+      <div class="drawer-scroll-body" id="drawer-body-content">
+        <!-- Dynamically rendered via app.js -->
+      </div>
+    </aside>
+
+  </div>
+
+  <script src="app.js?v=20260910_interlocking_v4"></script>
+  <!-- Floating SCADA Control Room Toast Notifications -->
+  <div id="control-room-toast-container" style="position: fixed; bottom: 28px; right: 28px; z-index: 99999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; max-width: 420px;"></div>
+</body>
+</html>

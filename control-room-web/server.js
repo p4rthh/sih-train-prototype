@@ -1,0 +1,41 @@
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+
+const PORT = 3005;
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.ttf': 'font/ttf',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2'
+};
+
+const server = http.createServer((req, res) => {
+  let pathname = (req.url || '/').split('?')[0];
+  let reqPath = pathname === '/' ? '/index.html' : pathname;
+  const filePath = path.join(__dirname, reqPath);
+  const ext = path.extname(filePath);
+  const contentType = MIME_TYPES[ext] || 'text/plain';
+
+  fs.readFile(filePath, (err, content) => {
+    if (err) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('404 Not Found');
+    } else {
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
+      });
+      res.end(content);
+    }
+  });
+});
+
+server.listen(PORT, () => {
+  console.log('NavaRail SCADA Control Room running at http://localhost:' + PORT);
+});

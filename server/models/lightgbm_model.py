@@ -87,7 +87,8 @@ class DelayLightGBM:
                     "q90_delta": 2.5
                 }
 
-        X_eval = X_input[FEATURE_NAMES]
+        expected_cols = getattr(self.point_model, "feature_name_", FEATURE_NAMES)
+        X_eval = X_input[[c for c in expected_cols if c in X_input.columns]]
         point = float(self.point_model.predict(X_eval)[0])
         q10 = float(self.q10_model.predict(X_eval)[0]) if self.q10_model else point - 1.5
         q90 = float(self.q90_model.predict(X_eval)[0]) if self.q90_model else point + 2.5
@@ -108,7 +109,8 @@ class DelayLightGBM:
                 n = len(X_input)
                 return np.zeros(n), np.full(n, -1.5), np.full(n, 2.5)
 
-        X_eval = X_input[FEATURE_NAMES]
+        expected_cols = getattr(self.point_model, "feature_name_", FEATURE_NAMES)
+        X_eval = X_input[[c for c in expected_cols if c in X_input.columns]]
         pts = self.point_model.predict(X_eval)
         q10s = self.q10_model.predict(X_eval) if self.q10_model else pts - 1.5
         q90s = self.q90_model.predict(X_eval) if self.q90_model else pts + 2.5

@@ -91,7 +91,26 @@ def get_live_ntes_anchor(train_no: str, start_date_str: Optional[str] = None) ->
         dstn_code = str(res.get("DSTN") or "").strip().upper()
         last_stn = str(res.get("LSTN") or "").strip().upper()
 
-        # Case 1: Train has NOT started yet in the real world
+        # Case 1: If today's train hasn't started yet, check if yesterday's overnight service is actively running on tracks
+        if trunst == 0 or "yet to start" in cpos_lower:
+            yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%d-%b-%Y")
+            res_yest = ntes_client.live_status(t_no, yesterday)
+            if res_yest and isinstance(res_yest, dict):
+                y_trunst = res_yest.get("TRUNST")
+                y_cpos = str(res_yest.get("CPOS") or "").strip()
+                y_last_stn = str(res_yest.get("LSTN") or "").strip().upper()
+                y_is_arr = bool(res_yest.get("isArrDSTN", False))
+                if (y_trunst == 1 or "departed from" in y_cpos.lower() or "arrived at" in y_cpos.lower()) and not y_is_arr:
+                    res = res_yest
+                    cpos = y_cpos
+                    cpos_lower = cpos.lower()
+                    trunst = y_trunst
+                    is_arr_dstn = False
+                    src_code = str(res.get("SRC") or "").strip().upper()
+                    dstn_code = str(res.get("DSTN") or "").strip().upper()
+                    last_stn = y_last_stn
+
+        # If still not started after checking yesterday
         if trunst == 0 or "yet to start" in cpos_lower:
             anchor_data = {
                 "train_no": t_no,

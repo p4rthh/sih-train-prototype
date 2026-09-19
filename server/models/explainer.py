@@ -5,10 +5,19 @@ from server.features.pipeline import FEATURE_NAMES
 
 class DelayReasonEngine:
     def __init__(self, lightgbm_point_model):
+        self.point_model = lightgbm_point_model
         self.explainer = shap.TreeExplainer(lightgbm_point_model)
+        self.expected_cols = getattr(lightgbm_point_model, "feature_name_", None)
+        if not self.expected_cols and hasattr(self.explainer.model, "original_model"):
+            orig = self.explainer.model.original_model
+            if hasattr(orig, "feature_name"):
+                self.expected_cols = orig.feature_name()
+        if not self.expected_cols:
+            self.expected_cols = FEATURE_NAMES
 
     def explain(self, features_df: pd.DataFrame) -> List[Dict[str, Any]]:
-        X = features_df[FEATURE_NAMES]
+        cols = [c for c in self.expected_cols if c in features_df.columns]
+        X = features_df[cols]
         shap_vals = self.explainer.shap_values(X)
         if isinstance(shap_vals, list):
             shap_vals = shap_vals[0]
@@ -17,7 +26,7 @@ class DelayReasonEngine:
         vals = shap_vals[0] if len(shap_vals.shape) > 1 else shap_vals
 
         impacts = []
-        for feat, val, s in zip(FEATURE_NAMES, row, vals):
+        for feat, val, s in zip(cols, row, vals):
             impacts.append({
                 "feature": feat,
                 "value": float(val),
